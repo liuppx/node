@@ -329,3 +329,165 @@ export class AuditDO {
     targetName!: string
 
 }
+
+@Entity('mpc_sessions')
+export class MpcSessionDO {
+    @PrimaryColumn({ length: 64, nullable: false, unique: true })
+    id!: string
+
+    @Column({ length: 16 })
+    type!: string
+
+    @Column({ length: 128, name: 'wallet_id' })
+    walletId!: string
+
+    @Column({ type: 'int' })
+    threshold!: number
+
+    @Column('text')
+    participants!: string
+
+    @Column({ length: 32 })
+    status!: string
+
+    @Column({ type: 'int' })
+    round!: number
+
+    @Column({ length: 32 })
+    curve!: string
+
+    @Column({ type: 'int', name: 'key_version' })
+    keyVersion!: number
+
+    @Column({ type: 'int', name: 'share_version' })
+    shareVersion!: number
+
+    @Column({ length: 64, name: 'created_at' })
+    createdAt!: string
+
+    @Column({ length: 64, name: 'expires_at' })
+    expiresAt!: string
+}
+
+@Entity('mpc_session_participants')
+export class MpcSessionParticipantDO {
+    @PrimaryGeneratedColumn('uuid')
+    uid!: string
+
+    @Column({ length: 64, name: 'session_id' })
+    sessionId!: string
+
+    @Column({ length: 64, name: 'participant_id' })
+    participantId!: string
+
+    @Column({ length: 128, name: 'device_id' })
+    deviceId!: string
+
+    @Column({ length: 256 })
+    identity!: string
+
+    @Column({ type: 'text', name: 'e2e_public_key' })
+    e2ePublicKey!: string
+
+    @Column({ type: 'text', name: 'signing_public_key', default: '' })
+    signingPublicKey!: string
+
+    @Column({ length: 32, default: 'active' })
+    status!: string
+
+    @Column({ length: 64, name: 'joined_at' })
+    joinedAt!: string
+}
+
+@Entity('mpc_messages')
+export class MpcMessageDO {
+    @PrimaryColumn({ length: 64, nullable: false, unique: true })
+    id!: string
+
+    @Column({ length: 64, name: 'session_id' })
+    sessionId!: string
+
+    @Column({ length: 64, name: 'sender' })
+    sender!: string
+
+    @Column({ length: 64, name: 'receiver', default: '' })
+    receiver!: string
+
+    @Column({ type: 'int', default: 0 })
+    round!: number
+
+    @Column({ length: 64 })
+    type!: string
+
+    @Column({ type: 'int', default: 0 })
+    seq!: number
+
+    @Column('text')
+    envelope!: string
+
+    @Column({ length: 64, name: 'created_at' })
+    createdAt!: string
+}
+
+@Entity('mpc_sign_requests')
+export class MpcSignRequestDO {
+    @PrimaryColumn({ length: 64, nullable: false, unique: true })
+    id!: string
+
+    @Column({ length: 128, name: 'wallet_id' })
+    walletId!: string
+
+    @Column({ length: 64, name: 'session_id' })
+    sessionId!: string
+
+    @Column({ length: 64 })
+    initiator!: string
+
+    @Column({ length: 32, name: 'payload_type' })
+    payloadType!: string
+
+    @Column({ length: 256, name: 'payload_hash' })
+    payloadHash!: string
+
+    @Column({ type: 'int', name: 'chain_id', default: 0 })
+    chainId!: number
+
+    @Column({ length: 32 })
+    status!: string
+
+    @Column('text')
+    approvals!: string
+
+    @Column({ length: 64, name: 'created_at' })
+    createdAt!: string
+}
+
+@Entity('mpc_audit_logs')
+export class MpcAuditLogDO {
+    @PrimaryColumn({ length: 64, nullable: false, unique: true })
+    id!: string
+
+    @Column({ length: 128, name: 'wallet_id' })
+    walletId!: string
+
+    @Column({ length: 64, name: 'session_id' })
+    sessionId!: string
+
+    @Column({ length: 16 })
+    level!: string
+
+    @Column({ length: 64 })
+    action!: string
+
+    @Column({ length: 64 })
+    actor!: string
+
+    @Column('text')
+    message!: string
+
+    @Column({ length: 64 })
+    time!: string
+
+    @Column('text')
+    metadata!: string
+}

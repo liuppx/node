@@ -35,6 +35,7 @@
 | Service | `/api/v1/public/*` | create/detail/search/delete/publish/unpublish |
 | Audit | `/api/v1/public/*` + `/api/v1/admin/*` | create/search/cancel/detail 在 public，approve/reject 在 admin（审批人也可调用） |
 | User | `/api/v1/admin/*` | 用户管理与状态变更 |
+| MPC | `/api/v1/public/*` | MPC 协调器会话/消息接口（需 UCAN） |
 
 ## 模块分组（常见）
 - **Application**: create/detail/search/delete/publish/unpublish
@@ -84,6 +85,15 @@
   - `POST /api/v1/public/audits/search`
   - `GET /api/v1/public/audits/:uid`
   - `DELETE /api/v1/public/audits/:uid`
+- **MPC Coordinator**
+  - `POST /api/v1/public/mpc/sessions`
+  - `POST /api/v1/public/mpc/sessions/:sessionId/join`
+  - `POST /api/v1/public/mpc/sessions/:sessionId/messages`
+  - `GET /api/v1/public/mpc/sessions/:sessionId/messages?since=...&cursor=...`
+  - `GET /api/v1/public/mpc/sessions/:sessionId`
+  - `GET /api/v1/public/mpc/ws?sessionId=...`（SSE 推送）
+  - 事件类型：`session-update` / `message` / `participant-joined`
+  - SSE 断线可使用 `Last-Event-ID` 或 `cursor` 续传（需 Redis Streams 启用）
 
 ### Admin（管理端）
 - **Audits**

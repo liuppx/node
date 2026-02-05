@@ -296,6 +296,23 @@ export function isUcanToken(token: string): boolean {
 }
 
 export function verifyUcanInvocation(token: string): { address: string; issuer: string } {
+  return verifyUcanInvocationWithRequired(token, [REQUIRED_UCAN_CAP]);
+}
+
+export function verifyUcanInvocationWithCap(
+  token: string,
+  requiredCap: UcanCapability[]
+): { address: string; issuer: string } {
+  if (!Array.isArray(requiredCap) || requiredCap.length === 0) {
+    return verifyUcanInvocation(token);
+  }
+  return verifyUcanInvocationWithRequired(token, requiredCap);
+}
+
+function verifyUcanInvocationWithRequired(
+  token: string,
+  requiredCap: UcanCapability[]
+): { address: string; issuer: string } {
   const { payload, exp } = verifyUcanJws(token);
   if (!payload.iss || !payload.aud) {
     throw new Error('Invalid UCAN token');
@@ -303,7 +320,7 @@ export function verifyUcanInvocation(token: string): { address: string; issuer: 
   if (payload.aud !== UCAN_AUD) {
     throw new Error('UCAN audience mismatch');
   }
-  if (!capsAllow(payload.cap || [], [REQUIRED_UCAN_CAP])) {
+  if (!capsAllow(payload.cap || [], requiredCap)) {
     throw new Error('UCAN capability denied');
   }
   const root = verifyProofChain(payload.iss, payload.cap || [], exp, payload.prf || []);

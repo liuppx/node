@@ -49,6 +49,38 @@ module.exports = {
     // How many approvals are required.
     requiredApprovals: 1
   },
+  mpc: {
+    // Message retention (days)
+    messageRetentionDays: 7,
+    // Audit log retention (days)
+    auditRetentionDays: 30,
+    // Cleanup job interval (ms)
+    cleanupIntervalMs: 15 * 60 * 1000,
+    // UCAN capability required for MPC endpoints (optional)
+    ucanResource: 'mpc',
+    ucanAction: 'coordinate'
+  },
+  redis: {
+    // Enable redis pub/sub for MPC events
+    enabled: false,
+    host: '127.0.0.1',
+    port: 6379,
+    username: '',
+    password: '',
+    db: 0,
+    keyPrefix: '',
+    channel: 'mpc_events',
+    tls: false,
+    // Optional: fixed instance id for event origin
+    instanceId: '',
+    // Redis Streams for event replay
+    streamEnabled: true,
+    // If true, SSE will read from streams only (no pub/sub)
+    streamOnly: false,
+    streamKeyPrefix: 'mpc:events:',
+    streamMaxLen: 10000,
+    streamApprox: true
+  },
   logger: {
     // If file is not set, logs go to console.
     // Winston log level: debug | info | warn | error

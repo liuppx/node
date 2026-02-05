@@ -165,3 +165,72 @@ erDiagram
 | created_at | varchar(64) | 创建时间 |
 | updated_at | varchar(64) | 更新时间 |
 | signature | varchar(192) | 签名（当前未校验） |
+
+## mpc_sessions
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | varchar(64) PK | 会话 ID |
+| type | varchar(16) | keygen/sign/refresh |
+| wallet_id | varchar(128) | 钱包 ID |
+| threshold | int | 门限 |
+| participants | text | 参与者列表 JSON |
+| status | varchar(32) | 会话状态 |
+| round | int | 当前轮次 |
+| curve | varchar(32) | 曲线 |
+| key_version | int | 公钥版本 |
+| share_version | int | share 版本 |
+| created_at | varchar(64) | 创建时间（epoch ms） |
+| expires_at | varchar(64) | 过期时间（epoch ms） |
+
+## mpc_session_participants
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| uid | uuid PK | 参与者主键 |
+| session_id | varchar(64) | 会话 ID |
+| participant_id | varchar(64) | 成员 ID |
+| device_id | varchar(128) | 设备指纹 |
+| identity | varchar(256) | 身份（did） |
+| e2e_public_key | text | E2E 公钥 |
+| signing_public_key | text | 签名公钥 |
+| status | varchar(32) | 状态 |
+| joined_at | varchar(64) | 加入时间（epoch ms） |
+
+## mpc_messages
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | varchar(64) PK | 消息 ID |
+| session_id | varchar(64) | 会话 ID |
+| sender | varchar(64) | 发送方 |
+| receiver | varchar(64) | 接收方（可空） |
+| round | int | 轮次 |
+| type | varchar(64) | 消息类型 |
+| seq | int | 序号 |
+| envelope | text | 加密信封 JSON |
+| created_at | varchar(64) | 创建时间（epoch ms） |
+
+## mpc_sign_requests
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | varchar(64) PK | 请求 ID |
+| wallet_id | varchar(128) | 钱包 ID |
+| session_id | varchar(64) | 会话 ID |
+| initiator | varchar(64) | 发起人 |
+| payload_type | varchar(32) | 负载类型 |
+| payload_hash | varchar(256) | 负载哈希 |
+| chain_id | int | 链 ID |
+| status | varchar(32) | 状态 |
+| approvals | text | 审批列表 JSON |
+| created_at | varchar(64) | 创建时间（epoch ms） |
+
+## mpc_audit_logs
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| id | varchar(64) PK | 日志 ID |
+| wallet_id | varchar(128) | 钱包 ID |
+| session_id | varchar(64) | 会话 ID |
+| level | varchar(16) | 级别 |
+| action | varchar(64) | 动作 |
+| actor | varchar(64) | 操作人 |
+| message | text | 描述 |
+| time | varchar(64) | 时间（epoch ms） |
+| metadata | text | 元数据 JSON |

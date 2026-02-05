@@ -36,6 +36,7 @@ All responses follow a common envelope:
 | Audit | `/api/v1/public/*` + `/api/v1/admin/*` | create/search/cancel/detail in public; approve/reject in admin (approvers allowed) |
 | User | `/api/v1/admin/*` | user management + status changes |
 | Config | `/api/v1/internal/*` | reserved |
+| MPC | `/api/v1/public/*` | MPC coordinator sessions/messages (UCAN required) |
 
 ## Module Groups (Typical)
 - **Application**: create, detail, search, delete, publish, unpublish
@@ -51,6 +52,16 @@ All responses follow a common envelope:
 - `PUT /api/v1/public/applications/:uid/config`
 - `GET /api/v1/public/services/:uid/config`
 - `PUT /api/v1/public/services/:uid/config`
+
+## MPC Coordinator
+- `POST /api/v1/public/mpc/sessions`
+- `POST /api/v1/public/mpc/sessions/:sessionId/join`
+- `POST /api/v1/public/mpc/sessions/:sessionId/messages`
+- `GET /api/v1/public/mpc/sessions/:sessionId/messages?since=...&cursor=...`
+- `GET /api/v1/public/mpc/sessions/:sessionId`
+- `GET /api/v1/public/mpc/ws?sessionId=...` (SSE stream)
+- Event types: `session-update` / `message` / `participant-joined`
+- Resume SSE with `Last-Event-ID` or `cursor` when Redis Streams are enabled
 
 ## Storage
 Backend storage APIs are deprecated. The frontend uploads directly to WebDAV using UCAN.

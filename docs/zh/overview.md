@@ -6,8 +6,15 @@
 - **审核（Audit）**：提交申请、审批通过/拒绝、撤销、详情、搜索
 - **用户/身份（User/State）**：用户详情、状态更新、角色管理（当前未强制）
 - **认证/健康检查（Auth/Health）**：登录（SIWE/UCAN）、刷新/登出、健康检查
+- **MPC 协调器（MPC）**：会话创建/加入、消息转发、SSE 推送
 
 > 完整接口以 `docs/zh/api.md` 为准。
+
+## MPC 事件分发
+- 默认内存事件总线（单实例）。
+- 启用 `redis.enabled=true` 后使用 Redis Pub/Sub 跨实例分发（SSE 客户端可跨节点接收）。
+- 启用 `redis.streamEnabled=true` 后使用 Redis Streams 保留事件，SSE 可用 `Last-Event-ID` 或 `cursor` 追读。
+- 若设置 `redis.streamOnly=true`，SSE 仅通过 Streams 拉取，不再依赖 Pub/Sub。
 
 ## 必要的鉴权/权限规则（应落地）
 - **统一鉴权**：除 public auth 外，所有接口必须 `Authorization: Bearer <JWT|UCAN>`。

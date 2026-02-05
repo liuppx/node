@@ -11,7 +11,12 @@ import {
     AuditDO,
     CommentDO,
     ServiceConfigDO,
-    ApplicationConfigDO
+    ApplicationConfigDO,
+    MpcSessionDO,
+    MpcSessionParticipantDO,
+    MpcMessageDO,
+    MpcSignRequestDO,
+    MpcAuditLogDO
 } from './domain/mapper/entity'
 import { SingletonDataSource } from './domain/facade/datasource';
 import { LoggerConfig, LoggerService } from './infrastructure/logger';
@@ -24,12 +29,16 @@ import { registerPublicApplicationRoutes } from './routes/public/applications';
 import { registerPublicServiceRoutes } from './routes/public/services';
 import { registerPublicAuditRoutes } from './routes/public/audits';
 import { registerPublicHealthRoute } from './routes/public/health';
+import { registerPublicMpcRoutes } from './routes/public/mpc';
 import { registerAdminAuditRoutes } from './routes/admin/audits';
 import { registerAdminUserRoutes } from './routes/admin/users';
 import { InitSchema20260126120000 } from './migrations/20260126120000-init-schema';
 import { AddServiceConfig20260128194500 } from './migrations/20260128194500-add-service-config';
 import { AddApplicationConfig20260128195500 } from './migrations/20260128195500-add-application-config';
+import { AddMpcCoordinator20260205120000 } from './migrations/20260205120000-add-mpc-coordinator';
 import { getConfig } from './config/runtime';
+import { startMpcCleanupJobs } from './domain/service/mpcCleanup';
+import { initMpcEventBus } from './domain/service/mpcEvents';
 
 // 初始化日志
 new LoggerService(getConfig<LoggerConfig>('logger')).initialize()
@@ -57,9 +66,19 @@ builder.entities([
     AuditDO,
     CommentDO,
     ServiceConfigDO,
-    ApplicationConfigDO
+    ApplicationConfigDO,
+    MpcSessionDO,
+    MpcSessionParticipantDO,
+    MpcMessageDO,
+    MpcSignRequestDO,
+    MpcAuditLogDO
 ])
-builder.migrations([InitSchema20260126120000, AddServiceConfig20260128194500, AddApplicationConfig20260128195500])
+builder.migrations([
+    InitSchema20260126120000,
+    AddServiceConfig20260128194500,
+    AddApplicationConfig20260128195500,
+    AddMpcCoordinator20260205120000
+])
 
 builder.build().initialize().then(async (conn) => {
     // 注册数据库连接
@@ -71,6 +90,8 @@ builder.build().initialize().then(async (conn) => {
     }
     await conn.runMigrations()
     console.log('The database has been initialized.')
+    initMpcEventBus()
+    startMpcCleanupJobs()
     // 创建 Express 应用
     const app = express();
     app.use(cors({ origin: true, credentials: true }));
@@ -107,6 +128,7 @@ builder.build().initialize().then(async (conn) => {
     registerPublicApplicationRoutes(app);
     registerPublicServiceRoutes(app);
     registerPublicAuditRoutes(app);
+    registerPublicMpcRoutes(app);
     registerAdminAuditRoutes(app);
     registerAdminUserRoutes(app);
 

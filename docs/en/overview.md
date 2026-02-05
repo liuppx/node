@@ -6,8 +6,15 @@
 - **Audit**: submit, approve/reject, cancel, detail, search
 - **User/State**: user detail, status update, role management (not enforced yet)
 - **Auth/Health**: login (SIWE/UCAN), refresh/logout, health check
+- **MPC Coordinator**: session create/join, message relay, SSE push
 
 > The definitive list is in `docs/en/api.md`.
+
+## MPC Event Distribution
+- In-memory event bus by default (single instance).
+- Enable `redis.enabled=true` to use Redis Pub/Sub for multi-instance SSE delivery.
+- Enable `redis.streamEnabled=true` to retain events in Redis Streams; SSE can resume via `Last-Event-ID` or `cursor`.
+- If `redis.streamOnly=true`, SSE reads solely from Streams (no Pub/Sub).
 
 ## Required Auth/Permission Rules (Should be enforced)
 - **Auth**: all non-public endpoints require `Authorization: Bearer <JWT|UCAN>`.

@@ -57,6 +57,75 @@ erDiagram
 | updated_at | varchar(64) | Updated time |
 | signature | varchar(192) | Signature (not verified) |
 
+## mpc_sessions
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | varchar(64) PK | Session ID |
+| type | varchar(16) | keygen/sign/refresh |
+| wallet_id | varchar(128) | Wallet ID |
+| threshold | int | Threshold |
+| participants | text | Participant list JSON |
+| status | varchar(32) | Session status |
+| round | int | Current round |
+| curve | varchar(32) | Curve |
+| key_version | int | Key version |
+| share_version | int | Share version |
+| created_at | varchar(64) | Created time (epoch ms) |
+| expires_at | varchar(64) | Expiry time (epoch ms) |
+
+## mpc_session_participants
+| Field | Type | Notes |
+| --- | --- | --- |
+| uid | uuid PK | Participant ID |
+| session_id | varchar(64) | Session ID |
+| participant_id | varchar(64) | Participant ID |
+| device_id | varchar(128) | Device fingerprint |
+| identity | varchar(256) | DID identity |
+| e2e_public_key | text | E2E public key |
+| signing_public_key | text | Signing public key |
+| status | varchar(32) | Status |
+| joined_at | varchar(64) | Joined time (epoch ms) |
+
+## mpc_messages
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | varchar(64) PK | Message ID |
+| session_id | varchar(64) | Session ID |
+| sender | varchar(64) | Sender |
+| receiver | varchar(64) | Receiver (optional) |
+| round | int | Round |
+| type | varchar(64) | Message type |
+| seq | int | Sequence |
+| envelope | text | Encrypted envelope JSON |
+| created_at | varchar(64) | Created time (epoch ms) |
+
+## mpc_sign_requests
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | varchar(64) PK | Request ID |
+| wallet_id | varchar(128) | Wallet ID |
+| session_id | varchar(64) | Session ID |
+| initiator | varchar(64) | Initiator |
+| payload_type | varchar(32) | Payload type |
+| payload_hash | varchar(256) | Payload hash |
+| chain_id | int | Chain ID |
+| status | varchar(32) | Status |
+| approvals | text | Approvals JSON |
+| created_at | varchar(64) | Created time (epoch ms) |
+
+## mpc_audit_logs
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | varchar(64) PK | Audit ID |
+| wallet_id | varchar(128) | Wallet ID |
+| session_id | varchar(64) | Session ID |
+| level | varchar(16) | Level |
+| action | varchar(64) | Action |
+| actor | varchar(64) | Actor |
+| message | text | Message |
+| time | varchar(64) | Time (epoch ms) |
+| metadata | text | Metadata JSON |
+
 ## user_state
 | Field | Type | Notes |
 | --- | --- | --- |

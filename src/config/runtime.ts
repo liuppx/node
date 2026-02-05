@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { AppRuntimeConfig, AuthRuntimeConfig, AuditRuntimeConfig, DatabaseConfig, UcanRuntimeConfig } from './index'
+import { AppRuntimeConfig, AuthRuntimeConfig, AuditRuntimeConfig, DatabaseConfig, UcanRuntimeConfig, MpcRuntimeConfig, RedisRuntimeConfig } from './index'
 import { LoggerConfig } from '../infrastructure/logger'
 
 export interface AppConfig {
@@ -10,6 +10,8 @@ export interface AppConfig {
   auth: AuthRuntimeConfig
   ucan: UcanRuntimeConfig
   audit?: AuditRuntimeConfig
+  mpc?: MpcRuntimeConfig
+  redis?: RedisRuntimeConfig
 }
 
 let cachedConfig: AppConfig | null = null
