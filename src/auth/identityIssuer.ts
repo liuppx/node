@@ -1,5 +1,6 @@
 import * as crypto from 'crypto'
 import { randomBytes, randomUUID } from 'node:crypto'
+import type { EntityManager } from 'typeorm'
 import { getConfig } from '../config/runtime'
 import { getNodeIssuerDid, getNodeIssuerJwk, getNodeIssuerKeyId, signNodeBytes } from '../security/nodeIssuer'
 import { SingletonDataSource } from '../domain/facade/datasource'
@@ -57,6 +58,37 @@ function credentialKind(type: IdentityCredentialType) {
   if (type === 'UsernameCredential') return 'username'
   if (type === 'AvatarCredential') return 'avatar'
   return 'wallet-account'
+}
+
+async function issueReissuedCredentials(manager: EntityManager, identity: string, credentialTypes: IdentityCredentialType[]) {
+  const credentialRepository = manager.getRepository(IdentityCredentialDO)
+  const accountLinkRepository = manager.getRepository(IdentityAccountLinkDO)
+  const credentials: Array<{ type: string; credentialId: string; credential: string }> = []
+  for (const credentialType of credentialTypes) {
+    const records = await credentialRepository.findBy({ identityDid: identity, credentialType, status: 'active' })
+    const source = records
+      .filter((record: IdentityCredentialDO) => !String(record.revokedAt || '').trim())
+      .sort((a: IdentityCredentialDO, b: IdentityCredentialDO) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0]
+    let claim: Record<string, unknown>
+    if (credentialType === 'WalletAccountCredential' && !source) {
+      const link = (await accountLinkRepository.findBy({ identityDid: identity, status: 'active' }))
+        .find(item => !String(item.revokedAt || '').trim())
+      if (!link) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
+      claim = { chainKey: link.chainKey, address: link.accountId, linkedAt: link.verifiedAt }
+    } else {
+      if (!source) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
+      claim = credentialClaimForReissue(source)
+    }
+    const credentialId = `urn:yeying:credential:reissue:${credentialKind(credentialType)}:${randomUUID()}`
+    claim.credentialStatus = { id: credentialId, type: 'YeyingCredentialStatusV1' }
+    const credential = issueIdentityCredential({ credentialId, subject: identity, type: credentialType, claim })
+    const payload = decodeCredentialPayload(credential)
+    const row = new IdentityCredentialDO()
+    Object.assign(row, { credentialId, identityDid: identity, credentialType, token: credential, status: 'active', issuedAt: new Date(payload.iat * 1000).toISOString(), expiresAt: new Date(payload.exp * 1000).toISOString(), revokedAt: '' })
+    await credentialRepository.save(row)
+    credentials.push({ type: credentialType, credentialId, credential })
+  }
+  return credentials
 }
 
 export function getIdentityIssuerDid() {
@@ -198,6 +230,21 @@ export async function createCredentialReissueChallenge(input: { identity: unknow
   return { challengeId: challenge.challengeId, identity, credentialTypes, nonce: challenge.nonce, issuedAt: now, expiresAt, proofPayload, signingInput: canonicalizeIdentityValue(proofPayload) }
 }
 
+export async function reissueCredentialsFromVerifiedFacts(input: { identity: unknown; credentialTypes: unknown }) {
+  const identity = assertIdentityDid(input.identity)
+  const credentialTypes = normalizeCredentialTypes(input.credentialTypes)
+  const ds = requireDataSource()
+  const issuedAt = new Date().toISOString()
+  let credentials: Array<{ type: string; credentialId: string; credential: string }> = []
+  await ds.transaction(async manager => {
+    credentials = await issueReissuedCredentials(manager, identity, credentialTypes)
+    const audit = new IdentityAuditLogDO()
+    Object.assign(audit, { identityDid: identity, action: 'identity_credential_reissued', outcome: 'success', metadataJson: JSON.stringify({ credentialTypes, credentialIds: credentials.map(item => item.credentialId), source: 'passkey_authorization' }), createdAt: issuedAt })
+    await manager.getRepository(IdentityAuditLogDO).save(audit)
+  })
+  return { identity, credentialTypes, credentials, reissuedAt: issuedAt }
+}
+
 export async function confirmCredentialReissue(input: { identity: unknown; challengeId: unknown; identityDocument: any; proof: any }) {
   const identity = assertIdentityDid(input.identity)
   const challengeId = String(input.challengeId || '').trim()
@@ -216,34 +263,11 @@ export async function confirmCredentialReissue(input: { identity: unknown; chall
   if (!crypto.verify(null, Buffer.from(canonicalizeIdentityValue(proofPayload)), publicKey, Buffer.from(String(proof.proofValue || ''), 'base64url'))) throw new Error('IDENTITY_CREDENTIAL_REISSUE_PROOF_INVALID')
 
   const issuedAt = new Date().toISOString()
-  const credentials: Array<{ type: string; credentialId: string; credential: string }> = []
+  let credentials: Array<{ type: string; credentialId: string; credential: string }> = []
   await ds.transaction(async manager => {
     const consumed = await manager.getRepository(IdentityCredentialReissueChallengeDO).update({ challengeId, status: 'pending' }, { status: 'consumed', consumedAt: issuedAt })
     if (!consumed.affected) throw new Error('IDENTITY_CREDENTIAL_REISSUE_CHALLENGE_NOT_FOUND')
-    const credentialRepository = manager.getRepository(IdentityCredentialDO)
-    for (const credentialType of credentialTypes) {
-      const records = await credentialRepository.findBy({ identityDid: identity, credentialType, status: 'active' })
-      const source = records
-        .filter((record: IdentityCredentialDO) => !String(record.revokedAt || '').trim())
-        .sort((a: IdentityCredentialDO, b: IdentityCredentialDO) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0]
-      let credentialId = `urn:yeying:credential:reissue:${credentialKind(credentialType)}:${randomUUID()}`
-      let claim: Record<string, unknown>
-      if (credentialType === 'WalletAccountCredential' && !source) {
-        const link = (await ds.getRepository(IdentityAccountLinkDO).findBy({ identityDid: identity, status: 'active' }))[0]
-        if (!link) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
-        claim = { chainKey: link.chainKey, address: link.accountId, linkedAt: link.verifiedAt }
-      } else {
-        if (!source) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
-        claim = credentialClaimForReissue(source)
-      }
-      claim.credentialStatus = { id: credentialId, type: 'YeyingCredentialStatusV1' }
-      const credential = issueIdentityCredential({ credentialId, subject: identity, type: credentialType, claim })
-      const payload = decodeCredentialPayload(credential)
-      const row = new IdentityCredentialDO()
-      Object.assign(row, { credentialId, identityDid: identity, credentialType, token: credential, status: 'active', issuedAt: new Date(payload.iat * 1000).toISOString(), expiresAt: new Date(payload.exp * 1000).toISOString(), revokedAt: '' })
-      await credentialRepository.save(row)
-      credentials.push({ type: credentialType, credentialId, credential })
-    }
+    credentials = await issueReissuedCredentials(manager, identity, credentialTypes)
     const audit = new IdentityAuditLogDO()
     Object.assign(audit, { identityDid: identity, action: 'identity_credential_reissued', outcome: 'success', metadataJson: JSON.stringify({ challengeId, credentialTypes, credentialIds: credentials.map(item => item.credentialId) }), createdAt: issuedAt })
     await manager.getRepository(IdentityAuditLogDO).save(audit)

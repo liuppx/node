@@ -9,6 +9,7 @@ import { assertPasskeyAuthReady, getPasskeyAuthStatus } from '../../auth/identit
 import { getConfig } from '../../config/runtime'
 import { issueCustodyRecoveryToken } from '../../auth/custodyRecoveryToken'
 import { consumeIdentityActionAuthorization, type IdentityActionAuthorization } from '../../auth/identityActionAuthorization'
+import { reissueCredentialsFromVerifiedFacts, type IdentityCredentialType } from '../../auth/identityIssuer'
 
 const REQUEST_TTL_MS = 5 * 60 * 1000
 const CODE_TTL_MS = 60 * 1000
@@ -119,6 +120,16 @@ function assertIdentityDid(value: unknown) {
   const did = string(value)
   if (!/^did:yeying:wid_[A-Za-z0-9_-]{22,}$/.test(did)) throw new Error('IDENTITY_INVALID_DID')
   return did
+}
+function credentialTypeForScope(scope: string): IdentityCredentialType | null {
+  if (scope === 'identity.wallet') return 'WalletAccountCredential'
+  if (scope === 'identity.email') return 'EmailCredential'
+  if (scope === 'identity.username') return 'UsernameCredential'
+  if (scope === 'identity.avatar') return 'AvatarCredential'
+  return null
+}
+function credentialTypesForScopes(requested: string[]): IdentityCredentialType[] {
+  return [...new Set(requested.map(credentialTypeForScope).filter((type): type is IdentityCredentialType => Boolean(type)))]
 }
 
 export class IdentityAuthorizationService {
@@ -292,6 +303,7 @@ export class IdentityAuthorizationService {
     } as any)
     if (!(verification as any).verified) throw new Error('IDENTITY_PASSKEY_AUTHORIZE_VERIFY_FAILED')
     const requested = scopes(JSON.parse(row.scopesJson))
+    await this.reissueMissingCredentialsForPasskeyAuthorization(credential.identityDid, requested)
     await this.assertIdentityCanSatisfyScopes(credential.identityDid, requested)
     credential.credentialId = credentialId
     credential.signCount = String((verification as any).authenticationInfo?.newCounter || credential.signCount || 0)
@@ -336,6 +348,24 @@ export class IdentityAuthorizationService {
     if (requested.includes('custody.recovery')) {
       const passkeys = await dataSource().getRepository(IdentityPasskeyCredentialDO).findBy({ identityDid })
       if (!passkeys.some(item => !string(item.revokedAt))) throw new Error('IDENTITY_PASSKEY_REQUIRED')
+    }
+  }
+
+  private async reissueMissingCredentialsForPasskeyAuthorization(identityDid: string, requested: string[]) {
+    const wanted = credentialTypesForScopes(requested)
+    if (wanted.length === 0) return
+    const credentials = await dataSource().getRepository(IdentityCredentialDO).findBy({ identityDid, status: 'active' })
+    const freshTypes = new Set(credentials
+      .filter(item => !string(item.revokedAt) && Date.parse(item.expiresAt) > Date.now())
+      .map(item => item.credentialType))
+    for (const credentialType of wanted.filter(type => !freshTypes.has(type))) {
+      try {
+        await reissueCredentialsFromVerifiedFacts({ identity: identityDid, credentialTypes: [credentialType] })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error || '')
+        if (message.startsWith(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)) continue
+        throw error
+      }
     }
   }
 
