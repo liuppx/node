@@ -2,7 +2,7 @@ import { createHmac, generateKeyPairSync, sign } from 'node:crypto'
 import { vi } from 'vitest'
 import { SingletonDataSource } from '../src/domain/facade/datasource'
 import { createInMemoryDataSource } from './helpers/inMemoryDataSource'
-import { IdentityAuditLogDO, IdentityCredentialDO, IdentityPasskeyCredentialDO, IdentityTotpAuthenticatorDO, IdentityWebauthnChallengeDO } from '../src/domain/mapper/entity'
+import { IdentityAccountLinkDO, IdentityAuditLogDO, IdentityCredentialDO, IdentityPasskeyCredentialDO, IdentityTotpAuthenticatorDO, IdentityWebauthnChallengeDO } from '../src/domain/mapper/entity'
 
 vi.mock('../src/config/runtime', () => ({
   getConfig: (key: string) => ({
@@ -13,11 +13,13 @@ vi.mock('../src/config/runtime', () => ({
     'identity.webauthn.rpName': 'YeYing Node',
     'identity.webauthn.origin': 'http://localhost:8100',
     'identity.webauthn.timeoutMs': 60_000,
-    'identity.webauthn.challengeTtlMs': 120_000
+    'identity.webauthn.challengeTtlMs': 120_000,
+    'issuer.baseUrl': 'https://node.example'
   } as Record<string, unknown>)[key]
 }))
 
 vi.mock('../src/security/secretVault', () => ({
+  getRuntimeSecret: () => '11'.repeat(32),
   getDerivedRuntimeSecret: () => '11'.repeat(32)
 }))
 
@@ -69,8 +71,9 @@ function signedIdentityDocument() {
 
 const { IdentityAuthorizationService } = await import('../src/domain/service/identityAuthorization')
 const { IdentityTotpService, getIdentityTotpStatus } = await import('../src/auth/identityTotpAuth')
-const { verifyRegistrationResponse } = await import('@simplewebauthn/server')
+const { generateAuthenticationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } = await import('@simplewebauthn/server')
 const { createIdentityActionChallenge } = await import('../src/auth/identityActionAuthorization')
+const { issueIdentityCredential } = await import('../src/auth/identityIssuer')
 
 async function actionAuthorization(action: string, payload: unknown) {
   const challenge = await createIdentityActionChallenge({ identity, action, audience: 'http://localhost:8100', payload })
@@ -203,6 +206,80 @@ describe('identity authorization', () => {
       period: 30,
       algorithm: 'SHA1'
     })
+  })
+
+  it('reissues expired credentials during passkey authorization', async () => {
+    const passkeyIdentity = 'did:yeying:wid_passkey123456789012345678'
+    const service = new IdentityAuthorizationService()
+    vi.mocked(generateAuthenticationOptions).mockResolvedValueOnce({ challenge: 'challenge-login', timeout: 60_000, allowCredentials: [], userVerification: 'required' } as any)
+    vi.mocked(verifyAuthenticationResponse).mockResolvedValueOnce({ verified: true, authenticationInfo: { newCounter: 2 } } as any)
+
+    const verifier = 'c'.repeat(43)
+    const codeChallenge = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))).toString('base64url')
+    const request = await service.create({
+      appId: 'project',
+      redirectUri: 'https://project.example/auth/callback',
+      codeChallenge,
+      codeChallengeMethod: 'S256',
+      scopes: ['identity.email', 'identity.username', 'identity.wallet', 'identity.avatar']
+    })
+    const auth = await service.createPasskeyAuthorizationChallenge({ requestId: request.requestId })
+
+    await SingletonDataSource.get()!.getRepository(IdentityPasskeyCredentialDO).save(Object.assign(new IdentityPasskeyCredentialDO(), {
+      identityDid: passkeyIdentity,
+      credentialId: 'passkey-login-1',
+      publicKey: Buffer.from('public-key').toString('base64url'),
+      signCount: '1',
+      aaguid: '',
+      transports: JSON.stringify(['internal']),
+      deviceName: 'Mac Touch ID',
+      rpId: 'localhost',
+      userHandle: passkeyIdentity,
+      createdAt: '2026-08-22T00:00:00.000Z',
+      lastUsedAt: '',
+      revokedAt: ''
+    }))
+    await SingletonDataSource.get()!.getRepository(IdentityAccountLinkDO).save(Object.assign(new IdentityAccountLinkDO(), {
+      identityDid: passkeyIdentity,
+      chainKey: 'eip155:1',
+      accountId: '0x5c7bf91c493126314bb821c123dee889ffca3932',
+      status: 'active',
+      verifiedAt: '2026-08-20T00:00:00.000Z',
+      revokedAt: ''
+    }))
+    for (const item of [
+      { type: 'EmailCredential' as const, credentialId: 'expired-email', claim: { email: 'alice@example.com', emailVerifiedAt: '2026-08-20T00:00:00.000Z' } },
+      { type: 'UsernameCredential' as const, credentialId: 'expired-username', claim: { username: 'alice', usernameVerifiedAt: '2026-08-20T00:00:00.000Z' } },
+      { type: 'AvatarCredential' as const, credentialId: 'expired-avatar', claim: { avatarUri: 'https://avatar.example/alice.png', avatarVerifiedAt: '2026-08-20T00:00:00.000Z' } }
+    ]) {
+      await SingletonDataSource.get()!.getRepository(IdentityCredentialDO).save(Object.assign(new IdentityCredentialDO(), {
+        credentialId: item.credentialId,
+        identityDid: passkeyIdentity,
+        credentialType: item.type,
+        token: issueIdentityCredential({ credentialId: item.credentialId, subject: passkeyIdentity, type: item.type, claim: { ...item.claim, credentialStatus: { id: item.credentialId, type: 'YeyingCredentialStatusV1' } } }),
+        status: 'active',
+        issuedAt: '2026-08-20T00:00:00.000Z',
+        expiresAt: '2026-08-21T00:00:00.000Z',
+        revokedAt: ''
+      }))
+    }
+
+    const clientDataJSON = Buffer.from(JSON.stringify({ type: 'webauthn.get', challenge: 'challenge-login', origin: 'http://localhost:8100' })).toString('base64url')
+    const approved = await service.confirmPasskeyAuthorization({
+      requestId: request.requestId,
+      passkeyRequestId: auth.passkeyRequest.requestId,
+      credential: {
+        id: 'passkey-login-1',
+        rawId: 'passkey-login-1',
+        type: 'public-key',
+        response: { clientDataJSON, authenticatorData: '', signature: '', userHandle: '' }
+      }
+    })
+    const exchanged = await service.exchange({ code: approved.authorizationCode, appId: 'project', redirectUri: 'https://project.example/auth/callback', codeVerifier: verifier })
+
+    expect(exchanged.did).toBe(passkeyIdentity)
+    expect(exchanged.credentials.map(item => item.type).sort()).toEqual(['AvatarCredential', 'EmailCredential', 'UsernameCredential', 'WalletAccountCredential'])
+    expect(exchanged.credentials.every(item => item.credentialId.includes(':reissue:'))).toBe(true)
   })
 
   it('accepts a published wallet extension origin for passkey registration', async () => {
