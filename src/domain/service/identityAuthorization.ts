@@ -9,7 +9,7 @@ import { assertPasskeyAuthReady, getPasskeyAuthStatus } from '../../auth/identit
 import { getConfig } from '../../config/runtime'
 import { issueCustodyRecoveryToken } from '../../auth/custodyRecoveryToken'
 import { consumeIdentityActionAuthorization, type IdentityActionAuthorization } from '../../auth/identityActionAuthorization'
-import { reissueCredentialsFromVerifiedFacts, type IdentityCredentialType } from '../../auth/identityIssuer'
+import { ensureIdentityCredentials, type IdentityCredentialType } from '../../auth/identityIssuer'
 
 const REQUEST_TTL_MS = 5 * 60 * 1000
 const CODE_TTL_MS = 60 * 1000
@@ -170,6 +170,7 @@ export class IdentityAuthorizationService {
     const presentationScopes = scopes((input.presentation as any)?.scopes)
     const requested = scopes(JSON.parse(row.scopesJson))
     if (requested.some(scope => !presentationScopes.includes(scope))) throw new Error('IDENTITY_PRESENTATION_SCOPE_INVALID')
+    await this.ensureCredentialsForScopes(identityDid, requested)
     await this.assertIdentityCanSatisfyScopes(identityDid, requested)
     return this.issueCode(row, identityDid)
   }
@@ -303,7 +304,7 @@ export class IdentityAuthorizationService {
     } as any)
     if (!(verification as any).verified) throw new Error('IDENTITY_PASSKEY_AUTHORIZE_VERIFY_FAILED')
     const requested = scopes(JSON.parse(row.scopesJson))
-    await this.reissueMissingCredentialsForPasskeyAuthorization(credential.identityDid, requested)
+    await this.ensureCredentialsForScopes(credential.identityDid, requested)
     await this.assertIdentityCanSatisfyScopes(credential.identityDid, requested)
     credential.credentialId = credentialId
     credential.signCount = String((verification as any).authenticationInfo?.newCounter || credential.signCount || 0)
@@ -351,21 +352,14 @@ export class IdentityAuthorizationService {
     }
   }
 
-  private async reissueMissingCredentialsForPasskeyAuthorization(identityDid: string, requested: string[]) {
+  private async ensureCredentialsForScopes(identityDid: string, requested: string[]) {
     const wanted = credentialTypesForScopes(requested)
     if (wanted.length === 0) return
-    const credentials = await dataSource().getRepository(IdentityCredentialDO).findBy({ identityDid, status: 'active' })
-    const freshTypes = new Set(credentials
-      .filter(item => !string(item.revokedAt) && Date.parse(item.expiresAt) > Date.now())
-      .map(item => item.credentialType))
-    for (const credentialType of wanted.filter(type => !freshTypes.has(type))) {
-      try {
-        await reissueCredentialsFromVerifiedFacts({ identity: identityDid, credentialTypes: [credentialType] })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error || '')
-        if (message.startsWith(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)) continue
-        throw error
-      }
+    try {
+      await ensureIdentityCredentials({ identity: identityDid, credentialTypes: wanted })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error || '')
+      if (!message.startsWith('IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:')) throw error
     }
   }
 

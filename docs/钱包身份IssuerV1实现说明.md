@@ -49,6 +49,8 @@ issuer: {
 
 JWT-VC 是短期出示凭证，邮箱、用户名和头像这类已验证事实保存在 Node 的凭证记录与撤销状态中。Wallet 发现本地 `EmailCredential`、`UsernameCredential` 或 `AvatarCredential` 过期、临近过期或尚未生效时，可以调用 reissue challenge/confirm 自动续签：challenge 绑定 DID、credential type、nonce 和过期时间；confirm 必须提交带 `manage` proof 的身份文档，并用当前 identity controller 对 challenge canonical payload 生成 `YeyingCredentialReissueProofV1`。Node 只会基于未撤销的既有记录重签同类型短期 JWT-VC，不接受只传 DID 直接重签。
 
+授权流程遵循《身份凭证生命周期与授权设计》：Passkey 和身份 presentation 授权会先调用统一的凭证确保服务，复用有效 JWT-VC，并仅基于未撤销的历史事实或 active 钱包账户链接补齐过期/缺失的短期凭证。自动续签不能恢复已撤销或已解绑事实；邮箱变更、钱包恢复、转账、解绑等敏感操作仍需 step-up 验证。`identity.avatar` 保持为正式身份 scope。
+
 邮箱验证码、用户名规范化和唯一性、账户关联 proof 校验、Wallet presentation、Router 登录和无钱包 Passkey 授权已经接入同一钱包身份模型。生产启用前仍必须完成密钥轮换、限流、审计导出、多实例验收，以及 DApp 后端对 JWT-VC issuer/JWKS/status 的强校验。
 
 此模块不替代普通 SIWE。DApp 不请求身份 scope 时，仍然只使用原有 SIWE challenge/verify 流程，Node 不参与身份资料获取。

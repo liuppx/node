@@ -45,7 +45,8 @@ function decodeCredentialPayload(token: string): any {
 function credentialClaimForReissue(record: IdentityCredentialDO) {
   const payload = decodeCredentialPayload(record.token)
   const subject = payload?.vc?.credentialSubject
-  if (!subject || subject.id !== record.identityDid) throw new Error('IDENTITY_CREDENTIAL_INVALID')
+  const types = Array.isArray(payload?.vc?.type) ? payload.vc.type : []
+  if (payload?.iss !== getIdentityIssuerDid() || payload?.sub !== record.identityDid || !types.includes(record.credentialType) || !subject || subject.id !== record.identityDid) throw new Error('IDENTITY_CREDENTIAL_INVALID')
   const { id: _id, credentialStatus: _credentialStatus, ...claim } = subject
   return {
     ...claim,
@@ -70,7 +71,7 @@ async function issueReissuedCredentials(manager: EntityManager, identity: string
       .filter((record: IdentityCredentialDO) => !String(record.revokedAt || '').trim())
       .sort((a: IdentityCredentialDO, b: IdentityCredentialDO) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0]
     let claim: Record<string, unknown>
-    if (credentialType === 'WalletAccountCredential' && !source) {
+    if (credentialType === 'WalletAccountCredential') {
       const link = (await accountLinkRepository.findBy({ identityDid: identity, status: 'active' }))
         .find(item => !String(item.revokedAt || '').trim())
       if (!link) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
@@ -89,6 +90,27 @@ async function issueReissuedCredentials(manager: EntityManager, identity: string
     credentials.push({ type: credentialType, credentialId, credential })
   }
   return credentials
+}
+
+export async function ensureIdentityCredentials(input: { identity: unknown; credentialTypes: unknown }) {
+  const identity = assertIdentityDid(input.identity)
+  const credentialTypes = normalizeCredentialTypes(input.credentialTypes)
+  const ds = requireDataSource()
+  const issuedAt = new Date().toISOString()
+  let credentials: Array<{ type: string; credentialId: string; credential: string }> = []
+  await ds.transaction(async manager => {
+    const repository = manager.getRepository(IdentityCredentialDO)
+    const fresh = new Set((await repository.findBy({ identityDid: identity, status: 'active' }))
+      .filter(item => !String(item.revokedAt || '').trim() && Date.parse(item.expiresAt) > Date.now())
+      .map(item => item.credentialType))
+    const missing = credentialTypes.filter(type => !fresh.has(type))
+    if (missing.length === 0) return
+    credentials = await issueReissuedCredentials(manager, identity, missing)
+    const audit = new IdentityAuditLogDO()
+    Object.assign(audit, { identityDid: identity, action: 'identity_credential_reissued', outcome: 'success', metadataJson: JSON.stringify({ credentialTypes: missing, credentialIds: credentials.map(item => item.credentialId), source: 'authorization_ensure' }), createdAt: issuedAt })
+    await manager.getRepository(IdentityAuditLogDO).save(audit)
+  })
+  return { identity, credentialTypes, credentials, reissuedAt: issuedAt }
 }
 
 export function getIdentityIssuerDid() {
