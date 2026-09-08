@@ -84,6 +84,8 @@ backup_config() {
   local passphrase_file="$SCRIPT_DIR/.passphrase-file"
   local config_file="$ROOT_DIR/config.js"
   local run_dir="$ROOT_DIR/run"
+  local nginx_test_conf="/etc/nginx/conf.d/test-node.conf"
+  local nginx_node_conf="/etc/nginx/conf.d/node.conf"
   local backup_file="${BACKUP_CONF_PREFIX}${RELEASE_DIR_NAME}${BACKUP_CONF_SUFFIX}"
   local backup_path="${BACKUP_DIR}/${backup_file}"
 
@@ -101,6 +103,12 @@ backup_config() {
   cleanup
   mkdir -p "$TMP_DIR" || fail "failed to create temp directory: $TMP_DIR"
   cp "$config_file" "$TMP_DIR/config.js" || fail "failed to copy config file: $config_file"
+  if [[ -f "$nginx_test_conf" ]]; then
+    cp "$nginx_test_conf" "$TMP_DIR/test-node.conf" || fail "failed to copy nginx config file: $nginx_test_conf"
+  fi
+  if [[ -f "$nginx_node_conf" ]]; then
+    cp "$nginx_node_conf" "$TMP_DIR/node.conf" || fail "failed to copy nginx config file: $nginx_node_conf"
+  fi
   cp -R "$run_dir" "$TMP_DIR/run" || fail "failed to copy run directory: $run_dir"
 
   log "start config backup: $ROOT_DIR -> $backup_path"
