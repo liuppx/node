@@ -54,7 +54,7 @@ require_command() {
 }
 
 load_backup_conf() {
-  local conf_file="$SCRIPT_DIR/backup.conf"
+  local conf_file="/data/${MODULE_NAME}/backup.conf"
   [[ -f "$conf_file" ]] || fail "backup config not found: $conf_file"
 
   # shellcheck disable=SC1090
@@ -81,7 +81,7 @@ backup_config() {
   require_command gpg
   require_command tar
 
-  local passphrase_file="$SCRIPT_DIR/.passphrase-file"
+  local passphrase_file="/data/${MODULE_NAME}/.passphrase-file"
   local config_file="$ROOT_DIR/config.js"
   local run_dir="$ROOT_DIR/run"
   local nginx_test_conf="/etc/nginx/conf.d/test-node.conf"
