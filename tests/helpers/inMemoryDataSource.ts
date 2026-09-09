@@ -24,8 +24,14 @@ export function createInMemoryDataSource() {
           }
           return row
         }
-        if (target.name === 'IdentityUsernameDO' && rows.some(item => item.namespace === row.namespace && item.normalizedUsername === row.normalizedUsername && ['active', 'reserved'].includes(item.status))) {
+        if (!row.uid && target.name && !('nonce' in row) && !('credentialId' in row) && !('challengeId' in row) && !('requestId' in row) && !('code' in row)) {
+          row.uid = `${target.name}_${rows.length + 1}`
+        }
+        if (target.name === 'IdentityUsernameDO' && rows.some(item => item.namespace === row.namespace && item.normalizedUsername === row.normalizedUsername && ['active', 'reserved'].includes(item.status) && item.uid !== row.uid)) {
           throw new Error('duplicate username')
+        }
+        if (target.name === 'IdentityUsernameDO' && row.status === 'active' && rows.some(item => item.namespace === row.namespace && item.identityDid === row.identityDid && item.status === 'active' && item.uid !== row.uid)) {
+          throw new Error('duplicate identity username')
         }
         const index = rows.findIndex(item => item.uid && row.uid && item.uid === row.uid)
         if (index >= 0) rows[index] = { ...rows[index], ...row }

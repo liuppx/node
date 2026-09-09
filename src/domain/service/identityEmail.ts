@@ -128,8 +128,15 @@ export class IdentityEmailService {
     const verifiedAt = new Date().toISOString()
     const credentials: Array<{ type: string; credentialId: string; credential: string }> = []
     if (challenge.username) {
-      await ds.getRepository(IdentityUsernameDO).update({ namespace: NAMESPACE, normalizedUsername: challenge.username, status: 'reserved' }, { status: 'active', reservedUntil: '', updatedAt: verifiedAt })
       const credentialId = `urn:yeying:credential:username:${challenge.id}`
+      await ds.transaction(async manager => {
+        const usernameRepository = manager.getRepository(IdentityUsernameDO)
+        const usernameRow = await usernameRepository.findOneBy({ namespace: NAMESPACE, normalizedUsername: challenge.username })
+        if (!usernameRow || usernameRow.identityDid !== challenge.identity) throw new Error('IDENTITY_USERNAME_TAKEN')
+        await usernameRepository.update({ namespace: NAMESPACE, identityDid: challenge.identity, status: 'active' }, { status: 'replaced', reservedUntil: '', updatedAt: verifiedAt })
+        await usernameRepository.update({ uid: usernameRow.uid }, { status: 'active', reservedUntil: '', updatedAt: verifiedAt })
+        await manager.getRepository(IdentityCredentialDO).update({ identityDid: challenge.identity, credentialType: 'UsernameCredential', status: 'active', revokedAt: '' }, { status: 'replaced', revokedAt: verifiedAt })
+      })
       const credential = issueIdentityCredential({
         credentialId,
         subject: challenge.identity,

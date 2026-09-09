@@ -104,6 +104,7 @@ import { AddIdentityActionChallenges20260904090000 } from './migrations/20260904
 import { RepairEmailTemplateTables20260909100000 } from './migrations/20260909100000-repair-email-template-tables';
 import { AddPusherChannelAcls20260909130000 } from './migrations/20260909130000-add-pusher-channel-acls';
 import { EnforceSingleIdentityAccountOwner20260909150000 } from './migrations/20260909150000-enforce-single-identity-account-owner';
+import { EnforceSingleActiveIdentityUsername20260909160000 } from './migrations/20260909160000-enforce-single-active-identity-username';
 import { AddScopedGrants20260808090000 } from './migrations/20260808090000-add-scoped-grants';
 import { getConfig } from './config/runtime';
 import { startActionRequestCleanupJobs } from './domain/service/actionRequestCleanup';
@@ -368,7 +369,8 @@ builder.migrations([
     AddIdentityActionChallenges20260904090000,
     RepairEmailTemplateTables20260909100000,
     AddPusherChannelAcls20260909130000,
-    EnforceSingleIdentityAccountOwner20260909150000
+    EnforceSingleIdentityAccountOwner20260909150000,
+    EnforceSingleActiveIdentityUsername20260909160000
 ])
 
 builder.build().initialize().then(async (conn) => {
