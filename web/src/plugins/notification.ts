@@ -456,6 +456,22 @@ class NotificationClient {
     return await parseEnvelope<EmailTemplateItem>(response)
   }
 
+  async deleteEmailTemplate(templateId: string, version = 1) {
+    const payload = { templateId, version }
+    const body = await createSignedActionBody({ action: 'admin_mail_template_delete', actor: getCurrentAccount() || '', payload, body: payload, sign: signWithWallet })
+    const params = new URLSearchParams()
+    params.set('version', String(version))
+    const response = await fetch(apiUrl(`/api/v1/admin/mail/templates/${encodeURIComponent(templateId)}?${params.toString()}`), {
+      method: 'DELETE',
+      headers: {
+        ...(await getAuthorizationHeaders({ interactive: true })),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    return await parseEnvelope<{ deleted: boolean }>(response)
+  }
+
   openStream(handlers: NotificationStreamHandlers = {}) {
     const controller = new AbortController()
     let closed = false

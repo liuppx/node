@@ -8,7 +8,7 @@
 - 前端订阅：`GET /api/v1/public/pusher/apps/:appId/stream`
 - 签名方式：`x-pusher-key` + `x-pusher-timestamp` + `x-pusher-signature`
 - 私有用户频道：`private-user.<wallet-address-or-node-subject>`
-- 私有 Project 频道：`private-project.<instanceId>`
+- 应用私有频道：`private-<application-defined-resource>`，例如 `private-workspace.<workspaceId>`
 
 ## Project 接入判断
 
@@ -87,7 +87,7 @@ Content-Type: application/json
   "channelPatterns": [
     "public-*",
     "private-user.*",
-    "private-project.*"
+    "private-*"
   ],
   "allowedOrigins": [
     "https://project.example.com"
@@ -113,22 +113,22 @@ php artisan pusher:smoke \
 
 一期原生 HTTP publish 不依赖 Laravel `BROADCAST_DRIVER=pusher`，Project 可以继续保持 `BROADCAST_DRIVER=log`。只有后续启用 Pusher-compatible HTTP / WebSocket 时，才需要评估 Laravel Broadcasting 配置。
 
-## 同步 Project 身份映射
+## 写入 Channel ACL
 
-`private-project.<instanceId>` 订阅需要 Node 能判断当前登录用户是否属于 Project 实例。
+`private-*` 订阅需要 Node 能判断当前登录用户是否被目标应用授权访问该频道。
 
-一期先由管理端或同步脚本写入映射：
+Node core 不维护 Project user id 等应用专用映射。Project 应在自己的业务层判断成员关系，然后把授权结果转换成通用 DID 或 account，写入 Node Pusher channel ACL：
 
 ```http
-POST /api/v1/admin/pusher/project-identities
+POST /api/v1/admin/pusher/channel/acls
 Authorization: Bearer <admin token>
 Content-Type: application/json
 
 {
-  "instanceId": "project-main",
-  "projectUserId": "1001",
-  "identityDid": "did:yeying:wid_abc",
-  "walletAddress": "0x1111111111111111111111111111111111111111",
+  "appId": "project",
+  "channel": "private-workspace.project-main",
+  "subject": "did:yeying:wid_abc",
+  "subjectType": "identity",
   "metadata": {
     "nickname": "Alice"
   }
@@ -182,7 +182,7 @@ export async function publishProjectEvent(input: {
     type: 'project.task.updated',
     source: 'project',
     channels: [
-      `private-project.${input.projectInstanceId}`,
+      `private-workspace.${input.projectInstanceId}`,
       `private-user.${input.projectUserWallet.toLowerCase()}`,
     ],
     data: {
@@ -277,7 +277,7 @@ while (true) {
 
 - `public-*` 频道不做成员校验。
 - `private-user.<subject>` 必须匹配当前登录主体。
-- `private-project.<instanceId>` 必须存在 active Project 身份映射。
+- 其它 `private-*` 必须存在 active channel ACL。
 - `allowedOrigins` 为空数组表示不限制；配置后，SSE 订阅请求的 `Origin` 必须匹配。
 - Redis 开启后，Pusher 使用 `redis.pusherChannel` 做多实例实时 fanout；Redis 关闭时退回单实例内存 fanout。
 - SSE 断线回放仍从数据库 `pusher_events` 按 cursor 读取，不依赖 Redis Streams。

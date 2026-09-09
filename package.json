@@ -29,7 +29,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@simplewebauthn/server": "^13.1.2",
+    "@simplewebauthn/server": "^13.3.2",
     "config": "^3.3.12",
     "cors": "^2.8.5",
     "ethers": "^6.16.0",
@@ -38,8 +38,8 @@
     "jsonwebtoken": "^9.0.3",
     "logform": "^2.7.0",
     "luxon": "^3.5.0",
-    "mysql2": "^3.22.2",
-    "nodemailer": "9.0.5",
+    "mysql2": "^3.23.1",
+    "nodemailer": "9.1.1",
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "siwe": "^3.0.0",
@@ -65,5 +65,8 @@
     "typescript": "^5.7.2",
     "vitest": "^4.1.2",
     "yaml": "^2.9.0"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

@@ -218,7 +218,7 @@ describe('public application routes idempotency', () => {
       secret: 'ps_test',
       secretMasked: 'ps_tes***test',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
@@ -231,7 +231,7 @@ describe('public application routes idempotency', () => {
       key: 'pk_test',
       secretMasked: 'ps_tes***test',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
@@ -245,7 +245,7 @@ describe('public application routes idempotency', () => {
       secret: 'ps_rotated',
       secretMasked: 'ps_rot***ated',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:01:00.000Z',
@@ -566,7 +566,7 @@ describe('public application routes idempotency', () => {
     }
     applicationStore.set(`uid:${existing.uid}`, existing)
     applicationStore.set(`did:${existing.did}:${existing.version}`, existing)
-    const redirectUris = ['https://project.example/passport/callback']
+    const redirectUris = ['https://project.example/identity/callback']
     const signedBody = await signBody({
       wallet,
       action: 'application_update',
@@ -590,7 +590,7 @@ describe('public application routes idempotency', () => {
 
       expect(response.status).toBe(200)
       expect(saveApplicationMock).toHaveBeenCalledTimes(1)
-      expect(responseJson.data.redirectUris).toBe('https://project.example/passport/callback')
+      expect(responseJson.data.redirectUris).toBe('https://project.example/identity/callback')
       expect(responseJson.data.status).toBe('BUSINESS_STATUS_ONLINE')
       expect(responseJson.data.isOnline).toBe(true)
       expect(notifyApplicationUpdatedMock).toHaveBeenCalledTimes(1)
@@ -773,7 +773,7 @@ describe('public application routes idempotency', () => {
         applicationUid: existing.uid,
         owner: actor,
         allowedOrigins: ['http://127.0.0.1:2222'],
-        channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+        channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       })
       expect(requestReplayStore.size).toBe(0)
     })

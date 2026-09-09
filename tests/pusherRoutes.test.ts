@@ -9,12 +9,13 @@ const serviceMocks = {
   listBacklog: vi.fn(),
   createApp: vi.fn(),
   listApps: vi.fn(),
-  upsertProjectIdentityMapping: vi.fn(),
-  listProjectIdentityMappings: vi.fn(),
+  upsertChannelAcl: vi.fn(),
+  listChannelAcls: vi.fn(),
   listNotificationPreferences: vi.fn(),
   upsertNotificationPreference: vi.fn(),
   listEmailTemplates: vi.fn(),
   upsertEmailTemplate: vi.fn(),
+  deleteEmailTemplate: vi.fn(),
 }
 
 vi.doMock('../src/common/permission', () => ({
@@ -111,9 +112,10 @@ describe('pusher routes', () => {
     serviceMocks.assertCanSubscribe.mockResolvedValue(undefined)
     serviceMocks.listBacklog.mockResolvedValue([])
     serviceMocks.listApps.mockResolvedValue([])
-    serviceMocks.listProjectIdentityMappings.mockResolvedValue([])
+    serviceMocks.listChannelAcls.mockResolvedValue([])
     serviceMocks.listNotificationPreferences.mockResolvedValue([])
     serviceMocks.listEmailTemplates.mockResolvedValue([])
+    serviceMocks.deleteEmailTemplate.mockResolvedValue({ deleted: true })
     serviceMocks.createApp.mockResolvedValue({
       uid: 'app-uid-1',
       appId: 'project',
@@ -126,16 +128,17 @@ describe('pusher routes', () => {
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     })
-    serviceMocks.upsertProjectIdentityMapping.mockResolvedValue({
-      uid: 'mapping-1',
-      instanceId: 'project-main',
-      projectUserId: '1001',
-      identityDid: actor,
-      walletAddress: actor,
+    serviceMocks.upsertChannelAcl.mockResolvedValue({
+      uid: 'acl-1',
+      appId: 'project',
+      channel: 'private-workspace.workspace-1',
+      subject: actor,
+      subjectType: 'account',
       metadata: { nickname: 'Alice' },
       status: 'active',
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '',
     })
     serviceMocks.upsertNotificationPreference.mockResolvedValue({
       uid: 'preference-1',
@@ -281,33 +284,34 @@ describe('pusher routes', () => {
     })
   })
 
-  it('upserts project identity mappings from the admin endpoint', async () => {
+  it('upserts pusher channel ACLs from the admin endpoint', async () => {
     const app = createTestApp()
 
     await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/v1/admin/pusher/project-identities`, {
+      const response = await fetch(`${baseUrl}/api/v1/admin/pusher/channel/acls`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          instanceId: 'project-main',
-          projectUserId: '1001',
-          identityDid: actor,
-          walletAddress: actor,
+          appId: 'project',
+          channel: 'private-workspace.workspace-1',
+          subject: actor,
+          subjectType: 'account',
           metadata: { nickname: 'Alice' },
         }),
       })
       const json = await response.json()
       expect(response.status).toBe(200)
-      expect(json.data.uid).toBe('mapping-1')
+      expect(json.data.uid).toBe('acl-1')
     })
 
-    expect(serviceMocks.upsertProjectIdentityMapping).toHaveBeenCalledWith({
-      instanceId: 'project-main',
-      projectUserId: '1001',
-      identityDid: actor,
-      walletAddress: actor,
+    expect(serviceMocks.upsertChannelAcl).toHaveBeenCalledWith({
+      appId: 'project',
+      channel: 'private-workspace.workspace-1',
+      subject: actor,
+      subjectType: 'account',
       metadata: { nickname: 'Alice' },
       status: undefined,
+      expiresAt: undefined,
     })
   })
 
@@ -377,6 +381,26 @@ describe('pusher routes', () => {
       textBody: { 'zh-CN': '{{title}}' },
       variables: ['title'],
       enabled: true,
+    })
+  })
+
+  it('deletes email templates from the admin endpoint', async () => {
+    const app = createTestApp()
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/pusher/email/templates/project-task-updated`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 2 }),
+      })
+      const json = await response.json()
+      expect(response.status).toBe(200)
+      expect(json.data).toEqual({ deleted: true })
+    })
+
+    expect(serviceMocks.deleteEmailTemplate).toHaveBeenCalledWith({
+      templateId: 'project-task-updated',
+      version: 2,
     })
   })
 })

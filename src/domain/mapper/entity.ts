@@ -775,25 +775,25 @@ export class PusherEventDO {
     createdAt!: string
 }
 
-@Entity('project_identity_mappings')
-@Index('uidx_project_identity_mapping_user', ['instanceId', 'projectUserId'], { unique: true })
-@Index('idx_project_identity_mapping_identity', ['instanceId', 'identityDid'])
-@Index('idx_project_identity_mapping_wallet', ['instanceId', 'walletAddress'])
-export class ProjectIdentityMappingDO {
+@Entity('pusher_channel_acls')
+@Index('uidx_pusher_channel_acl_subject', ['appId', 'channel', 'subject'], { unique: true })
+@Index('idx_pusher_channel_acl_app_channel', ['appId', 'channel'])
+@Index('idx_pusher_channel_acl_subject', ['subject'])
+export class PusherChannelAclDO {
     @PrimaryGeneratedColumn('uuid')
     uid!: string
 
-    @Column({ length: 128, name: 'instance_id' })
-    instanceId!: string
+    @Column({ length: 64, name: 'app_id' })
+    appId!: string
 
-    @Column({ length: 128, name: 'project_user_id' })
-    projectUserId!: string
+    @Column({ length: 128 })
+    channel!: string
 
-    @Column({ length: 128, name: 'identity_did' })
-    identityDid!: string
+    @Column({ length: 128 })
+    subject!: string
 
-    @Column({ length: 128, name: 'wallet_address', default: '' })
-    walletAddress!: string
+    @Column({ length: 32, name: 'subject_type', default: 'account' })
+    subjectType!: string
 
     @Column({ type: 'text', name: 'metadata_json', default: '{}' })
     metadataJson!: string
@@ -806,6 +806,9 @@ export class ProjectIdentityMappingDO {
 
     @Column({ length: 64, name: 'updated_at', default: '' })
     updatedAt!: string
+
+    @Column({ length: 64, name: 'expires_at', default: '' })
+    expiresAt!: string
 }
 
 @Entity('action_requests')

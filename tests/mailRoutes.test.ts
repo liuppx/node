@@ -10,6 +10,7 @@ const mailProviderMocks = {
 const pusherServiceMocks = {
   listEmailTemplates: vi.fn(),
   upsertEmailTemplate: vi.fn(),
+  deleteEmailTemplate: vi.fn(),
 }
 
 vi.doMock('../src/domain/service/mailProvider', () => mailProviderMocks)
@@ -95,6 +96,7 @@ describe('mail admin routes', () => {
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
     })
+    pusherServiceMocks.deleteEmailTemplate.mockResolvedValue({ deleted: true })
   })
 
   it('returns mail provider status without SMTP secrets', async () => {
@@ -169,6 +171,26 @@ describe('mail admin routes', () => {
       textBody: { 'zh-CN': '{{notification.title}}' },
       variables: ['notification.title'],
       enabled: true,
+    })
+  })
+
+  it('deletes email templates from the dedicated mail endpoint', async () => {
+    const app = createTestApp()
+
+    await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/v1/admin/mail/templates/project-task-updated`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 2 }),
+      })
+      const json = await response.json()
+      expect(response.status).toBe(200)
+      expect(json.data).toEqual({ deleted: true })
+    })
+
+    expect(pusherServiceMocks.deleteEmailTemplate).toHaveBeenCalledWith({
+      templateId: 'project-task-updated',
+      version: 2,
     })
   })
 })

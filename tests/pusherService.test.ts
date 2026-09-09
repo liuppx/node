@@ -16,7 +16,7 @@ import {
   PusherService,
 } from '../src/domain/service/pusher'
 import { SingletonDataSource } from '../src/domain/facade/datasource'
-import { ProjectIdentityMappingDO, PusherAppDO } from '../src/domain/mapper/entity'
+import { IdentityAccountLinkDO, PusherAppDO, PusherChannelAclDO } from '../src/domain/mapper/entity'
 import { createInMemoryDataSource } from './helpers/inMemoryDataSource'
 
 describe('pusher service helpers', () => {
@@ -117,7 +117,7 @@ describe('pusher service helpers', () => {
     ).resolves.toMatchObject({ accepted: true, idempotent: false })
   })
 
-  it('authorizes private project channels through project identity mappings', async () => {
+  it('authorizes private application channels through pusher channel ACLs', async () => {
     const dataSource = createInMemoryDataSource()
     SingletonDataSource.set(dataSource as any)
     await dataSource.getRepository(PusherAppDO).save({
@@ -127,35 +127,45 @@ describe('pusher service helpers', () => {
       secretMasked: '***',
       secretCiphertext: encryptPusherAppSecret('ps_test'),
       allowedOriginsJson: '[]',
-      channelPatternsJson: JSON.stringify(['private-project.*']),
+      channelPatternsJson: JSON.stringify(['private-*']),
       status: 'active',
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
     })
-    await dataSource.getRepository(ProjectIdentityMappingDO).save({
-      uid: 'mapping-1',
-      instanceId: 'project-main',
-      projectUserId: '1001',
+    await dataSource.getRepository(IdentityAccountLinkDO).save({
+      uid: 'link-1',
       identityDid: 'did:yeying:wid_1',
-      walletAddress: '0x1111111111111111111111111111111111111111',
+      chainKey: 'eip155:1',
+      accountId: '0x1111111111111111111111111111111111111111',
+      status: 'active',
+      verifiedAt: '2026-09-01T00:00:00.000Z',
+      revokedAt: '',
+    })
+    await dataSource.getRepository(PusherChannelAclDO).save({
+      uid: 'acl-1',
+      appId: 'project',
+      channel: 'private-workspace.workspace-1',
+      subject: 'did:yeying:wid_1',
+      subjectType: 'identity',
       metadataJson: '{}',
       status: 'active',
       createdAt: '2026-09-01T00:00:00.000Z',
       updatedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '',
     })
 
     const service = new PusherService()
     await expect(
       service.assertCanSubscribe({
         appId: 'project',
-        channels: ['private-project.project-main'],
+        channels: ['private-workspace.workspace-1'],
         subject: '0x1111111111111111111111111111111111111111',
       })
     ).resolves.toBeUndefined()
     await expect(
       service.assertCanSubscribe({
         appId: 'project',
-        channels: ['private-project.project-main'],
+        channels: ['private-workspace.workspace-1'],
         subject: '0x2222222222222222222222222222222222222222',
       })
     ).rejects.toThrow('subscription denied')
