@@ -16,9 +16,10 @@ export class CustodyManager {
         chainKey: 'eip155:1',
         accountId: subject,
         status: 'active',
+        revokedAt: '',
       },
     })
-    if (!link || String(link.revokedAt || '').trim()) {
+    if (!link) {
       return 0
     }
     const credentials = await ds.getRepository(IdentityPasskeyCredentialDO).findBy({

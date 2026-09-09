@@ -422,8 +422,9 @@ export class NotificationService {
       const link = await this.identityAccountLinkRepository.findOneBy({
         accountId: normalized,
         status: 'active',
+        revokedAt: '',
       })
-      if (link && !String(link.revokedAt || '').trim()) {
+      if (link) {
         identityDid = String(link.identityDid || '').trim()
       }
     }

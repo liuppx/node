@@ -57,6 +57,15 @@ function requireDataSource() {
   return ds
 }
 
+function isActiveAccountUniqueViolation(error: unknown) {
+  const driverError = (error as { driverError?: { code?: unknown; constraint?: unknown; message?: unknown }; code?: unknown; constraint?: unknown; message?: unknown })?.driverError || error as { code?: unknown; constraint?: unknown; message?: unknown }
+  const code = String(driverError?.code || '')
+  const constraint = String(driverError?.constraint || '')
+  const message = String(driverError?.message || (error as Error)?.message || '')
+  return code === '23505'
+    && (constraint === 'uidx_identity_account_active_account' || message.includes('uidx_identity_account_active_account'))
+}
+
 export function verifyIdentityController(document: any, expectedIdentity: string) {
   if (document?.id !== expectedIdentity || !document?.proof?.proofValue) throw new Error('IDENTITY_DOCUMENT_INVALID')
   const method = String(document.proof.verificationMethod || '')
@@ -99,15 +108,18 @@ export async function verifyAccountLink(input: { identityDocument: any; identity
   const result = { identity, account, verifiedAt: new Date().toISOString(), purpose: 'identity-account-link' }
   await ds.getRepository(IdentityAccountLinkChallengeDO).update({ nonce: input.nonce, status: 'pending' }, { status: 'consumed', consumedAt: result.verifiedAt })
   const linkRepository = ds.getRepository(IdentityAccountLinkDO)
-  const existing = await linkRepository.findOneBy({ identityDid: identity, chainKey: account.chainKey, accountId: account.address, status: 'active' })
+  const existing = await linkRepository.findOneBy({ identityDid: identity, chainKey: account.chainKey, accountId: account.address, status: 'active', revokedAt: '' })
   if (existing) return { ...result, verifiedAt: existing.verifiedAt, duplicate: true }
+  const activeAccountOwner = await linkRepository.findOneBy({ chainKey: account.chainKey, accountId: account.address, status: 'active', revokedAt: '' })
+  if (activeAccountOwner && activeAccountOwner.identityDid !== identity) throw new Error('IDENTITY_ACCOUNT_ALREADY_LINKED')
   const link = new IdentityAccountLinkDO()
   Object.assign(link, { identityDid: identity, chainKey: account.chainKey, accountId: account.address, status: 'active', verifiedAt: result.verifiedAt, revokedAt: '' })
   try {
     await linkRepository.save(link)
   } catch (error) {
-    const race = await linkRepository.findOneBy({ identityDid: identity, chainKey: account.chainKey, accountId: account.address, status: 'active' })
+    const race = await linkRepository.findOneBy({ identityDid: identity, chainKey: account.chainKey, accountId: account.address, status: 'active', revokedAt: '' })
     if (race) return { ...result, verifiedAt: race.verifiedAt, duplicate: true }
+    if (isActiveAccountUniqueViolation(error)) throw new Error('IDENTITY_ACCOUNT_ALREADY_LINKED')
     throw error
   }
   return result
@@ -117,6 +129,6 @@ export async function isAccountLinked(identity: string, account: unknown) {
   const normalizedIdentity = assertDid(identity)
   const normalizedAccount = normalizeAccount(account)
   const ds = requireDataSource()
-  const row = await ds.getRepository(IdentityAccountLinkDO).findOneBy({ identityDid: normalizedIdentity, chainKey: normalizedAccount.chainKey, accountId: normalizedAccount.address, status: 'active' })
+  const row = await ds.getRepository(IdentityAccountLinkDO).findOneBy({ identityDid: normalizedIdentity, chainKey: normalizedAccount.chainKey, accountId: normalizedAccount.address, status: 'active', revokedAt: '' })
   return Boolean(row)
 }

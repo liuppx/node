@@ -72,8 +72,7 @@ async function issueReissuedCredentials(manager: EntityManager, identity: string
       .sort((a: IdentityCredentialDO, b: IdentityCredentialDO) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0]
     let claim: Record<string, unknown>
     if (credentialType === 'WalletAccountCredential') {
-      const link = (await accountLinkRepository.findBy({ identityDid: identity, status: 'active' }))
-        .find(item => !String(item.revokedAt || '').trim())
+      const link = (await accountLinkRepository.findBy({ identityDid: identity, status: 'active', revokedAt: '' }))[0]
       if (!link) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
       claim = { chainKey: link.chainKey, address: link.accountId, linkedAt: link.verifiedAt }
     } else {
@@ -224,7 +223,7 @@ export async function createCredentialReissueChallenge(input: { identity: unknow
   const repo = ds.getRepository(IdentityCredentialDO)
   for (const credentialType of credentialTypes) {
     if (credentialType === 'WalletAccountCredential') {
-      const links = await ds.getRepository(IdentityAccountLinkDO).findBy({ identityDid: identity, status: 'active' })
+      const links = await ds.getRepository(IdentityAccountLinkDO).findBy({ identityDid: identity, status: 'active', revokedAt: '' })
       if (links.length === 0) throw new Error(`IDENTITY_CREDENTIAL_REISSUE_UNAVAILABLE:${credentialType}`)
       continue
     }

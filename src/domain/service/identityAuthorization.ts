@@ -321,7 +321,7 @@ export class IdentityAuthorizationService {
     pkce(input.codeVerifier, row.codeChallenge); row.used = true; row.usedAt = now(); await repo.save(row)
     const requested = scopes(JSON.parse(row.scopesJson)); const credentials = await dataSource().getRepository(IdentityCredentialDO).findBy({ identityDid: row.identityDid, status: 'active' })
     const wanted = new Set(requested.includes('identity.email') ? ['EmailCredential'] : []); if (requested.includes('identity.username')) wanted.add('UsernameCredential'); if (requested.includes('identity.avatar')) wanted.add('AvatarCredential'); if (requested.includes('identity.wallet')) wanted.add('WalletAccountCredential')
-    const accountLinks = await dataSource().getRepository(IdentityAccountLinkDO).findBy({ identityDid: row.identityDid, status: 'active' })
+    const accountLinks = await dataSource().getRepository(IdentityAccountLinkDO).findBy({ identityDid: row.identityDid, status: 'active', revokedAt: '' })
     const walletAddress = accountLinks.find(link => link.chainKey?.startsWith('eip155:'))?.accountId || ''
     let custodyRecovery: { token: string; expiresAt: number } | undefined
     if (requested.includes('custody.recovery')) {
@@ -338,8 +338,8 @@ export class IdentityAuthorizationService {
   }
 
   private async assertIdentityCanSatisfyScopes(identityDid: string, requested: string[]) {
-    const accountLinks = await dataSource().getRepository(IdentityAccountLinkDO).findBy({ identityDid, status: 'active' })
-    if (requested.includes('identity.wallet') && !accountLinks.some(link => !string(link.revokedAt))) throw new Error('IDENTITY_WALLET_ACCOUNT_REQUIRED')
+    const accountLinks = await dataSource().getRepository(IdentityAccountLinkDO).findBy({ identityDid, status: 'active', revokedAt: '' })
+    if (requested.includes('identity.wallet') && accountLinks.length === 0) throw new Error('IDENTITY_WALLET_ACCOUNT_REQUIRED')
     const credentials = await dataSource().getRepository(IdentityCredentialDO).findBy({ identityDid, status: 'active' })
     const activeTypes = new Set(credentials.filter(item => !string(item.revokedAt) && Date.parse(item.expiresAt) > Date.now()).map(item => item.credentialType))
     if (requested.includes('identity.email') && !activeTypes.has('EmailCredential')) throw new Error('IDENTITY_EMAIL_REQUIRED')
