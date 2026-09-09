@@ -133,4 +133,20 @@ export function registerAdminMailRoutes(app: Express) {
       res.status(mapped.status).json(fail(mapped.status, mapped.message))
     }
   })
+
+  app.delete('/api/v1/admin/mail/templates/:templateId', async (req: Request, res: Response) => {
+    try {
+      const actor = getRequestUser()
+      if (!actor?.address) { res.status(401).json(fail(401, 'Missing access token')); return }
+      const payload = {
+        templateId: req.params.templateId,
+        version: req.body?.version || req.query.version,
+      }
+      const result = await executeSignedAction({ raw: req.body || {}, action: 'admin_mail_template_delete', actor: actor.address, payload, execute: async () => ({ status: 200, body: ok(await pusherService.deleteEmailTemplate(payload)) }), onError: error => { const message = error instanceof Error ? error.message : 'Mail request failed'; const status = getActionSignatureErrorStatus(message) ?? 400; return { status, body: fail(status, message) } } })
+      res.status(result.status).json(result.body)
+    } catch (error) {
+      const mapped = mapMailError(error)
+      res.status(mapped.status).json(fail(mapped.status, mapped.message))
+    }
+  })
 }

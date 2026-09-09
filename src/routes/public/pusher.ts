@@ -307,4 +307,18 @@ export function registerAdminPusherRoutes(app: Express) {
       res.status(mapped.status).json(fail(mapped.status, mapped.message))
     }
   })
+
+  app.delete('/api/v1/admin/pusher/email/templates/:templateId', async (req: Request, res: Response) => {
+    try {
+      const payload = {
+        templateId: req.params.templateId,
+        version: req.body?.version || req.query.version,
+      }
+      const result = await signedAdminAction(req, 'admin_pusher_email_template_delete', payload, () => service.deleteEmailTemplate(payload))
+      res.status(result.status).json(result.body)
+    } catch (error) {
+      const mapped = mapPusherError(error)
+      res.status(mapped.status).json(fail(mapped.status, mapped.message))
+    }
+  })
 }

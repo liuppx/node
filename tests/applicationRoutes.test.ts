@@ -566,7 +566,7 @@ describe('public application routes idempotency', () => {
     }
     applicationStore.set(`uid:${existing.uid}`, existing)
     applicationStore.set(`did:${existing.did}:${existing.version}`, existing)
-    const redirectUris = ['https://project.example/passport/callback']
+    const redirectUris = ['https://project.example/identity/callback']
     const signedBody = await signBody({
       wallet,
       action: 'application_update',
@@ -590,7 +590,7 @@ describe('public application routes idempotency', () => {
 
       expect(response.status).toBe(200)
       expect(saveApplicationMock).toHaveBeenCalledTimes(1)
-      expect(responseJson.data.redirectUris).toBe('https://project.example/passport/callback')
+      expect(responseJson.data.redirectUris).toBe('https://project.example/identity/callback')
       expect(responseJson.data.status).toBe('BUSINESS_STATUS_ONLINE')
       expect(responseJson.data.isOnline).toBe(true)
       expect(notifyApplicationUpdatedMock).toHaveBeenCalledTimes(1)

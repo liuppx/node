@@ -246,131 +246,159 @@
         </div>
       </div>
       <div v-else class="email-layout">
-        <section class="email-settings-panel">
-          <div class="panel-heading">
-            <div class="detail-section-title">{{ $t('notification_email_settings') }}</div>
-            <el-tag :type="mailSettings?.configured ? 'success' : 'warning'" effect="light">
-              {{ mailSettings?.configured ? $t('notification_email_configured') : $t('notification_email_not_configured') }}
-            </el-tag>
-          </div>
-          <div v-if="mailSettingsLoading" class="panel-empty">{{ $t('header_notification_loading') }}</div>
-          <template v-else>
-            <div class="mail-status-grid">
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_provider') }}</span>
-                <span class="meta-value">{{ mailSettings?.provider || '-' }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_host') }}</span>
-                <span class="meta-value">{{ mailSettings?.host || '-' }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_port') }}</span>
-                <span class="meta-value">{{ mailSettings?.port || '-' }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_secure') }}</span>
-                <span class="meta-value">{{ yesNo(Boolean(mailSettings?.secure)) }}</span>
-              </div>
-              <div class="meta-item wide">
-                <span class="meta-label">{{ $t('notification_email_from') }}</span>
-                <span class="meta-value">{{ mailSettings?.from || '-' }}</span>
-              </div>
-              <div class="meta-item wide">
-                <span class="meta-label">{{ $t('notification_email_reply_to') }}</span>
-                <span class="meta-value">{{ mailSettings?.replyTo || '-' }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_auth_user') }}</span>
-                <span class="meta-value">{{ yesNo(Boolean(mailSettings?.hasAuthUser)) }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_auth_password') }}</span>
-                <span class="meta-value">{{ yesNo(Boolean(mailSettings?.hasAuthPassword)) }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_worker') }}</span>
-                <span class="meta-value">{{ yesNo(Boolean(mailSettings?.delivery.enabled)) }}</span>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">{{ $t('notification_email_batch_size') }}</span>
-                <span class="meta-value">{{ mailSettings?.delivery.batchSize || '-' }}</span>
-              </div>
-            </div>
-            <div v-if="mailSettings?.issues?.length" class="mail-issues">
-              <el-tag v-for="issue in mailSettings.issues" :key="issue" type="warning" effect="plain">{{ issue }}</el-tag>
-            </div>
-            <div class="email-test-form">
-              <el-input v-model="mailTestForm.to" :placeholder="$t('notification_email_test_to')" />
-              <el-input v-model="mailTestForm.subject" :placeholder="$t('notification_email_test_subject')" />
-              <el-button type="primary" :loading="mailTestSending" :disabled="!mailSettings?.configured" @click="submitMailTest">
-                {{ $t('notification_email_send_test') }}
-              </el-button>
-            </div>
-          </template>
-        </section>
-
         <section class="email-template-panel">
           <div class="template-head">
-            <div class="detail-section-title">{{ $t('notification_email_templates') }}</div>
+            <div>
+              <div class="detail-section-title">{{ $t('notification_email_templates') }}</div>
+              <p class="section-desc">{{ $t('notification_email_templates_desc') }}</p>
+            </div>
             <div class="template-actions">
-              <el-button @click="resetEmailTemplateForm">{{ $t('notification_email_new_template') }}</el-button>
+              <el-button type="primary" @click="openNewEmailTemplateDialog">{{ $t('notification_email_new_template') }}</el-button>
               <el-button @click="loadEmailTemplates">{{ $t('notification_reload') }}</el-button>
             </div>
           </div>
-          <div class="email-template-grid">
-            <div class="email-template-form">
-              <el-input v-model="emailTemplateForm.templateId" :placeholder="$t('notification_email_template_id')" :disabled="Boolean(editingEmailTemplateId)" />
-              <el-input-number v-model="emailTemplateForm.version" :min="1" controls-position="right" />
-              <el-input v-model="emailTemplateForm.appId" :placeholder="$t('notification_email_template_app')" />
-              <el-select v-model="emailTemplateForm.category" :placeholder="$t('notification_email_template_category')">
-                <el-option v-for="item in emailCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
-              </el-select>
-              <el-input v-model="emailTemplateForm.eventTypesText" type="textarea" :rows="2" :placeholder="$t('notification_email_template_events')" />
-              <el-input v-model="emailTemplateForm.zhSubject" :placeholder="$t('notification_email_template_subject')" />
-              <el-input v-model="emailTemplateForm.zhTextBody" type="textarea" :rows="4" :placeholder="$t('notification_email_template_text')" />
-              <el-input v-model="emailTemplateForm.zhHtmlBody" type="textarea" :rows="5" :placeholder="$t('notification_email_template_html')" />
-              <el-input v-model="emailTemplateForm.variablesText" type="textarea" :rows="2" :placeholder="$t('notification_email_template_variables')" />
-              <div class="template-form-actions">
-                <el-switch v-model="emailTemplateForm.enabled" />
-                <el-button type="primary" :loading="emailTemplateSaving" @click="submitEmailTemplate">
-                  {{ $t('notification_email_save_template') }}
-                </el-button>
-              </div>
-            </div>
-            <div class="email-template-list">
-              <div v-if="emailTemplatesLoading" class="panel-empty">{{ $t('header_notification_loading') }}</div>
-              <div v-else-if="emailTemplates.length === 0" class="panel-empty">{{ $t('notification_email_templates_empty') }}</div>
-              <div v-else class="template-items">
-                <div v-for="item in emailTemplates" :key="`${item.templateId}:${item.version}`" class="template-item">
-                  <div class="template-item-head">
-                    <div>
-                      <div class="template-id">{{ item.templateId }} v{{ item.version }}</div>
-                      <div class="template-meta">
-                        <span>{{ $t('notification_email_template_app') }}：{{ item.appId || '-' }}</span>
-                        <span>{{ item.category || '-' }}</span>
-                      </div>
-                    </div>
-                    <div class="template-item-actions">
-                      <el-tag :type="item.enabled ? 'success' : 'info'" effect="light">
-                        {{ item.enabled ? $t('notification_email_enabled') : $t('notification_email_disabled') }}
-                      </el-tag>
-                      <el-button text @click="editEmailTemplate(item)">{{ $t('notification_email_edit_template') }}</el-button>
+          <div class="email-template-list">
+            <div v-if="emailTemplatesLoading" class="panel-empty">{{ $t('header_notification_loading') }}</div>
+            <div v-else-if="emailTemplates.length === 0" class="panel-empty">{{ $t('notification_email_templates_empty') }}</div>
+            <div v-else class="template-items">
+              <div v-for="item in emailTemplates" :key="`${item.templateId}:${item.version}`" class="template-item">
+                <div class="template-item-head">
+                  <div>
+                    <div class="template-id">{{ item.templateId }} v{{ item.version }}</div>
+                    <div class="template-meta">
+                      <span>{{ appName(item.appId) }}</span>
+                      <span>{{ item.category || '-' }}</span>
+                      <span>{{ formatFullTime(item.updatedAt) }}</span>
                     </div>
                   </div>
-                  <div class="template-subject">{{ item.subject?.['zh-CN'] || '-' }}</div>
-                  <div class="webhook-events">
-                    <el-tag v-for="eventName in item.eventTypes" :key="eventName" size="small" effect="plain">
-                      {{ eventName }}
+                  <div class="template-item-actions">
+                    <el-tag :type="item.enabled ? 'success' : 'info'" effect="light">
+                      {{ item.enabled ? $t('notification_email_enabled') : $t('notification_email_disabled') }}
                     </el-tag>
+                    <el-button text @click="openEditEmailTemplateDialog(item)">{{ $t('notification_email_edit_template') }}</el-button>
+                    <el-button text type="danger" :loading="emailTemplateDeletingKey === `${item.templateId}:${item.version}`" @click="removeEmailTemplate(item)">
+                      {{ $t('notification_email_delete_template') }}
+                    </el-button>
                   </div>
+                </div>
+                <div class="template-subject">{{ item.subject?.['zh-CN'] || '-' }}</div>
+                <div class="webhook-events">
+                  <el-tag v-for="eventName in item.eventTypes" :key="eventName" size="small" effect="plain">
+                    {{ eventName }}
+                  </el-tag>
                 </div>
               </div>
             </div>
           </div>
+
+          <el-collapse class="email-settings-collapse">
+            <el-collapse-item name="settings">
+              <template #title>
+                <div class="collapse-title">
+                  <span>{{ $t('notification_email_settings') }}</span>
+                  <el-tag :type="mailSettings?.configured ? 'success' : 'warning'" effect="light">
+                    {{ mailSettings?.configured ? $t('notification_email_configured') : $t('notification_email_not_configured') }}
+                  </el-tag>
+                </div>
+              </template>
+              <div v-if="mailSettingsLoading" class="panel-empty compact-empty">{{ $t('header_notification_loading') }}</div>
+              <template v-else>
+                <div class="mail-status-grid">
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_provider') }}</span>
+                    <span class="meta-value">{{ mailSettings?.provider || '-' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_host') }}</span>
+                    <span class="meta-value">{{ mailSettings?.host || '-' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_port') }}</span>
+                    <span class="meta-value">{{ mailSettings?.port || '-' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_secure') }}</span>
+                    <span class="meta-value">{{ yesNo(Boolean(mailSettings?.secure)) }}</span>
+                  </div>
+                  <div class="meta-item wide">
+                    <span class="meta-label">{{ $t('notification_email_from') }}</span>
+                    <span class="meta-value">{{ mailSettings?.from || '-' }}</span>
+                  </div>
+                  <div class="meta-item wide">
+                    <span class="meta-label">{{ $t('notification_email_reply_to') }}</span>
+                    <span class="meta-value">{{ mailSettings?.replyTo || '-' }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_auth_user') }}</span>
+                    <span class="meta-value">{{ yesNo(Boolean(mailSettings?.hasAuthUser)) }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_auth_password') }}</span>
+                    <span class="meta-value">{{ yesNo(Boolean(mailSettings?.hasAuthPassword)) }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_worker') }}</span>
+                    <span class="meta-value">{{ yesNo(Boolean(mailSettings?.delivery.enabled)) }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="meta-label">{{ $t('notification_email_batch_size') }}</span>
+                    <span class="meta-value">{{ mailSettings?.delivery.batchSize || '-' }}</span>
+                  </div>
+                </div>
+                <div v-if="mailSettings?.issues?.length" class="mail-issues">
+                  <el-tag v-for="issue in mailSettings.issues" :key="issue" type="warning" effect="plain">{{ issue }}</el-tag>
+                </div>
+                <div class="email-test-form">
+                  <el-input v-model="mailTestForm.to" :placeholder="$t('notification_email_test_to')" />
+                  <el-input v-model="mailTestForm.subject" :placeholder="$t('notification_email_test_subject')" />
+                  <el-button type="primary" :loading="mailTestSending" :disabled="!mailSettings?.configured" @click="submitMailTest">
+                    {{ $t('notification_email_send_test') }}
+                  </el-button>
+                </div>
+              </template>
+            </el-collapse-item>
+          </el-collapse>
         </section>
       </div>
     </template>
+
+    <el-dialog
+      v-model="emailTemplateDialogVisible"
+      :title="editingEmailTemplateId ? $t('notification_email_edit_template') : $t('notification_email_new_template')"
+      width="720px"
+      destroy-on-close
+    >
+      <div class="email-template-form">
+        <el-input v-model="emailTemplateForm.templateId" :placeholder="$t('notification_email_template_id')" :disabled="Boolean(editingEmailTemplateId)" />
+        <el-input-number v-model="emailTemplateForm.version" :min="1" controls-position="right" />
+        <el-select v-model="emailTemplateForm.appId" clearable filterable :placeholder="$t('notification_email_template_app')">
+          <el-option :label="$t('notification_email_template_global_app')" value="" />
+          <el-option
+            v-for="item in ownedApplications"
+            :key="item.uid"
+            :label="item.name || item.uid"
+            :value="item.uid"
+          />
+        </el-select>
+        <el-select v-model="emailTemplateForm.category" :placeholder="$t('notification_email_template_category')">
+          <el-option v-for="item in emailCategoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-input v-model="emailTemplateForm.eventTypesText" type="textarea" :rows="2" :placeholder="$t('notification_email_template_events')" />
+        <el-input v-model="emailTemplateForm.zhSubject" :placeholder="$t('notification_email_template_subject')" />
+        <el-input v-model="emailTemplateForm.zhTextBody" type="textarea" :rows="4" :placeholder="$t('notification_email_template_text')" />
+        <el-input v-model="emailTemplateForm.zhHtmlBody" type="textarea" :rows="5" :placeholder="$t('notification_email_template_html')" />
+        <el-input v-model="emailTemplateForm.variablesText" type="textarea" :rows="2" :placeholder="$t('notification_email_template_variables')" />
+      </div>
+      <template #footer>
+        <div class="template-form-actions">
+          <el-switch v-model="emailTemplateForm.enabled" />
+          <el-button @click="emailTemplateDialogVisible = false">{{ $t('notification_email_cancel') }}</el-button>
+          <el-button type="primary" :loading="emailTemplateSaving" @click="submitEmailTemplate">
+            {{ $t('notification_email_save_template') }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="deliveryDialogVisible"
@@ -435,6 +463,7 @@
 <script lang="ts" setup>
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
+import { ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import $notification, { type EmailTemplateItem, type MailSettings, type NotificationDeliveryItem, type NotificationListItem, type NotificationStreamPayload, type NotificationWebhookItem } from '@/plugins/notification'
 import { getNotificationLevelLabel, getNotificationSourceLabel, getNotificationTypeLabel, resolveNotificationRoute } from '@/plugins/notificationMeta'
@@ -467,6 +496,8 @@ const mailTestSending = ref(false)
 const emailTemplates = ref<EmailTemplateItem[]>([])
 const emailTemplatesLoading = ref(false)
 const emailTemplateSaving = ref(false)
+const emailTemplateDialogVisible = ref(false)
+const emailTemplateDeletingKey = ref('')
 const editingEmailTemplateId = ref('')
 const deliveryDialogVisible = ref(false)
 const deliveryLoading = ref(false)
@@ -639,6 +670,15 @@ function deliveryStatusType(status: string): 'success' | 'info' | 'warning' | 'd
 
 function yesNo(value: boolean) {
   return value ? String($t('notification_email_yes')) : String($t('notification_email_no'))
+}
+
+function appName(appId: string) {
+  const normalized = String(appId || '').trim()
+  if (!normalized) {
+    return String($t('notification_email_template_global_app'))
+  }
+  const app = ownedApplications.value.find((item) => String(item.uid || '').trim() === normalized)
+  return app?.name ? `${app.name} (${normalized})` : normalized
 }
 
 function parseDelimitedList(value: string) {
@@ -885,7 +925,12 @@ function resetEmailTemplateForm() {
   emailTemplateForm.enabled = true
 }
 
-function editEmailTemplate(item: EmailTemplateItem) {
+function openNewEmailTemplateDialog() {
+  resetEmailTemplateForm()
+  emailTemplateDialogVisible.value = true
+}
+
+function openEditEmailTemplateDialog(item: EmailTemplateItem) {
   editingEmailTemplateId.value = item.templateId
   emailTemplateForm.templateId = item.templateId
   emailTemplateForm.version = Number(item.version || 1)
@@ -897,6 +942,7 @@ function editEmailTemplate(item: EmailTemplateItem) {
   emailTemplateForm.zhHtmlBody = item.htmlBody?.['zh-CN'] || ''
   emailTemplateForm.variablesText = (item.variables || []).join('\n')
   emailTemplateForm.enabled = item.enabled !== false
+  emailTemplateDialogVisible.value = true
 }
 
 async function submitEmailTemplate() {
@@ -929,11 +975,39 @@ async function submitEmailTemplate() {
       emailTemplates.value.unshift(saved)
     }
     editingEmailTemplateId.value = saved.templateId
+    emailTemplateDialogVisible.value = false
     notifySuccess(String($t('notification_email_template_save_success')))
   } catch (error) {
     notifyError(`${$t('notification_email_template_save_failed')}：${error}`)
   } finally {
     emailTemplateSaving.value = false
+  }
+}
+
+async function removeEmailTemplate(item: EmailTemplateItem) {
+  try {
+    await ElMessageBox.confirm(
+      String($t('notification_email_delete_template_confirm_desc')),
+      String($t('notification_email_delete_template_confirm_title')),
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+  const key = `${item.templateId}:${item.version}`
+  emailTemplateDeletingKey.value = key
+  try {
+    await $notification.deleteEmailTemplate(item.templateId, Number(item.version || 1))
+    emailTemplates.value = emailTemplates.value.filter((entry) => `${entry.templateId}:${entry.version}` !== key)
+    if (editingEmailTemplateId.value === item.templateId && Number(emailTemplateForm.version || 1) === Number(item.version || 1)) {
+      resetEmailTemplateForm()
+      emailTemplateDialogVisible.value = false
+    }
+    notifySuccess(String($t('notification_email_delete_template_success')))
+  } catch (error) {
+    notifyError(`${$t('notification_email_delete_template_failed')}：${error}`)
+  } finally {
+    emailTemplateDeletingKey.value = ''
   }
 }
 
@@ -1495,10 +1569,10 @@ onBeforeUnmount(() => {
 }
 
 .email-layout {
-  display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
-  gap: 16px;
+  flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .email-permission-panel {
@@ -1561,6 +1635,10 @@ onBeforeUnmount(() => {
 
 .email-template-panel {
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .panel-heading,
@@ -1572,6 +1650,28 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.section-desc {
+  margin: -4px 0 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.collapse-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-right: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.compact-empty {
+  min-height: 96px;
 }
 
 .mail-status-grid {
@@ -1593,6 +1693,7 @@ onBeforeUnmount(() => {
 
 .email-test-form {
   display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
   gap: 12px;
   margin-top: 16px;
 }
@@ -1612,6 +1713,12 @@ onBeforeUnmount(() => {
 .email-template-list,
 .template-items {
   min-width: 0;
+}
+
+.email-template-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .template-items {
@@ -1654,6 +1761,30 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.template-item-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.email-settings-collapse {
+  flex: 0 0 auto;
+}
+
+.email-settings-collapse :deep(.el-collapse-item__header) {
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.email-settings-collapse :deep(.el-collapse-item__wrap) {
+  border-bottom: none;
+}
+
+.email-settings-collapse :deep(.el-collapse-item__content) {
+  padding: 16px 0 0;
 }
 
 .webhook-form {
@@ -1847,6 +1978,23 @@ onBeforeUnmount(() => {
 
   .delivery-item-grid {
     grid-template-columns: 1fr;
+  }
+
+  .email-test-form {
+    grid-template-columns: 1fr;
+  }
+
+  .template-head,
+  .template-item-head,
+  .template-form-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .template-actions,
+  .template-item-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

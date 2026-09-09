@@ -909,7 +909,7 @@ Project 不应把 Node Pusher 配置为现有任务变更同步的前置条件�
 Project `.env` 可逐步从历史 Pusher 预留项升级为可选 Node Pusher 桥接配置：
 
 ```env
-PASSPORT_NODE_URL=https://node.example.com
+IDENTITY_NODE_URL=https://node.example.com
 PUSHER_APP_ID=project
 PUSHER_APP_KEY=<node-issued-key>
 PUSHER_APP_SECRET=<node-issued-secret>

@@ -101,6 +101,7 @@ import { NormalizeWalletAddressSubjects20260827080000 } from './migrations/20260
 import { AddPusherCore20260901120000 } from './migrations/20260901120000-add-pusher-core';
 import { AddPusherAppOwner20260902100000 } from './migrations/20260902100000-add-pusher-app-owner';
 import { AddIdentityActionChallenges20260904090000 } from './migrations/20260904090000-add-identity-action-challenges';
+import { RepairEmailTemplateTables20260909100000 } from './migrations/20260909100000-repair-email-template-tables';
 import { AddScopedGrants20260808090000 } from './migrations/20260808090000-add-scoped-grants';
 import { getConfig } from './config/runtime';
 import { startActionRequestCleanupJobs } from './domain/service/actionRequestCleanup';
@@ -362,7 +363,8 @@ builder.migrations([
     NormalizeWalletAddressSubjects20260827080000,
     AddPusherCore20260901120000,
     AddPusherAppOwner20260902100000,
-    AddIdentityActionChallenges20260904090000
+    AddIdentityActionChallenges20260904090000,
+    RepairEmailTemplateTables20260909100000
 ])
 
 builder.build().initialize().then(async (conn) => {

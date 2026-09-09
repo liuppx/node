@@ -634,6 +634,16 @@ export class PusherService {
     return this.mapEmailTemplate(saved)
   }
 
+  async deleteEmailTemplate(input: { templateId: string; version?: number }): Promise<{ deleted: boolean }> {
+    const templateId = normalizeIdentifier(input.templateId, '')
+    const version = Number.isFinite(input.version) && Number(input.version) > 0 ? Math.trunc(Number(input.version)) : 1
+    if (!templateId) {
+      throw new Error('Email template id is required')
+    }
+    const result = await this.emailTemplateRepository.delete({ templateId, version })
+    return { deleted: Number(result.affected || 0) > 0 }
+  }
+
   async publish(input: PusherPublishInput): Promise<PusherPublishResult> {
     const app = await this.requireActiveApp(input.appId)
     if (String(input.key || '').trim() !== app.key) {
