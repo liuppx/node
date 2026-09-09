@@ -218,7 +218,7 @@ describe('public application routes idempotency', () => {
       secret: 'ps_test',
       secretMasked: 'ps_tes***test',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
@@ -231,7 +231,7 @@ describe('public application routes idempotency', () => {
       key: 'pk_test',
       secretMasked: 'ps_tes***test',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:00:00.000Z',
@@ -245,7 +245,7 @@ describe('public application routes idempotency', () => {
       secret: 'ps_rotated',
       secretMasked: 'ps_rot***ated',
       allowedOrigins: ['http://127.0.0.1:2222'],
-      channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+      channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       status: 'active',
       createdAt: '2026-09-02T00:00:00.000Z',
       updatedAt: '2026-09-02T00:01:00.000Z',
@@ -773,7 +773,7 @@ describe('public application routes idempotency', () => {
         applicationUid: existing.uid,
         owner: actor,
         allowedOrigins: ['http://127.0.0.1:2222'],
-        channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+        channelPatterns: ['public-*', 'private-user.*', 'private-*'],
       })
       expect(requestReplayStore.size).toBe(0)
     })

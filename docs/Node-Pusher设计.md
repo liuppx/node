@@ -44,7 +44,7 @@ Node Pusher 的价值在于社区级事件和通知控制面，而不是把 Proj
 - 统一通知中心：事件需要进入 Node 收件箱、未读、偏好、邮件、Webhook 或后续 Web Push 投递链路。
 - 持久化和回放：断线后需要按 `cursor` / `Last-Event-ID` 回放事件，或需要审计事件是否已发布。
 - 多实例 fanout：Project/Router/Warehouse 自身不想重复建设跨节点在线 fanout 和事件总线。
-- 统一身份鉴权：订阅权限需要基于 DID、wallet、Project user id 映射和 `private-user.*` / `private-project.*` 策略统一治理。
+- 统一身份鉴权：订阅权限需要基于 DID、wallet、通用账号绑定和应用侧 channel ACL 统一治理。
 - 低耦合集成：外部系统只理解 Node 的标准 HTTP + SSE 协议，不需要直连 Project 内部 WebSocket 或理解 Project 私有消息格式。
 
 不建议一开始把 Project 所有高频任务字段变更双发到 Node Pusher。应先选择少量跨应用有价值、幂等清晰、不会造成重复通知的事件，例如 `project.task.assigned`、`project.task.due_changed`、`project.mention.created`、`project.file.shared`。
@@ -225,7 +225,7 @@ type PusherApp = {
 - `key`：客户端连接时使用的公开 key，可以暴露给浏览器。
 - `secretCiphertext`：服务端签名密钥，必须加密存储。
 - `allowedOrigins`：允许建立浏览器连接的来源。
-- `allowedChannels`：允许使用的频道模式，例如 `private-user.*`、`private-project.*`。
+- `allowedChannels`：允许使用的频道模式，例如 `private-user.*`、`private-*`。
 - `allowedEvents`：允许发布的事件模式，例如 `task.*`、`file.*`。
 
 ### 7.2 Channel
@@ -235,9 +235,8 @@ type PusherApp = {
 ```text
 public-{topic}
 private-user.{walletAddressOrIdentityDid}
-private-project.{instanceId}
-private-app.{appId}
-presence-project.{instanceId}
+private-{applicationDefinedResource}
+presence-{applicationDefinedResource}
 ```
 
 命名约束：
@@ -314,7 +313,7 @@ Content-Type: application/json
   "type": "task.updated",
   "source": "project",
   "subject": "task:123",
-  "channels": ["private-project.project-main", "private-user.0x1111111111111111111111111111111111111111"],
+  "channels": ["private-workspace.project-main", "private-user.0x1111111111111111111111111111111111111111"],
   "data": {
     "taskId": 123,
     "status": "done"
@@ -335,7 +334,7 @@ Content-Type: application/json
 {
   "eventId": "evt_01J...",
   "accepted": true,
-  "channels": ["private-project.project-main", "private-user.0x1111111111111111111111111111111111111111"],
+  "channels": ["private-workspace.project-main", "private-user.0x1111111111111111111111111111111111111111"],
   "persisted": true
 }
 ```
@@ -343,7 +342,7 @@ Content-Type: application/json
 ### 8.2 Node 原生 SSE 订阅
 
 ```http
-GET /api/v1/public/pusher/apps/:appId/stream?channels=private-user.0x1111111111111111111111111111111111111111,private-project.project-main
+GET /api/v1/public/pusher/apps/:appId/stream?channels=private-user.0x1111111111111111111111111111111111111111,private-workspace.project-main
 Authorization: Bearer <user JWT or UCAN>
 Accept: text/event-stream
 ```
@@ -376,7 +375,7 @@ POST /apps/:appId/events
 ```json
 {
   "name": "task.updated",
-  "channels": ["private-project.project-main"],
+  "channels": ["private-workspace.project-main"],
   "data": "{\"taskId\":123}",
   "socket_id": "123.456"
 }
@@ -417,7 +416,7 @@ GET /app/:key?protocol=7&client=js&version=...
 {
   "event": "pusher:subscribe",
   "data": {
-    "channel": "private-project.project-main",
+    "channel": "private-workspace.project-main",
     "auth": "app-key:signature"
   }
 }
@@ -528,7 +527,7 @@ Authorization: Bearer <user JWT or UCAN>
 ```json
 {
   "socketId": "123.456",
-  "channel": "private-project.project-main"
+  "channel": "private-workspace.project-main"
 }
 ```
 
@@ -540,21 +539,21 @@ Pusher-compatible 授权响应：
 }
 ```
 
-### 8.7 Project 身份映射
+### 8.7 Channel ACL
 
-`private-project.<instanceId>` 订阅需要 Node 能判断当前登录主体是否属于 Project 实例。一期使用 Project 身份映射表，由管理端或同步脚本写入：
+`private-*` 订阅需要 Node 判断当前登录主体是否被目标应用授权访问该频道。Node core 不维护 Project user id 等应用专用映射；Project、Warehouse、Router 等上游应用应把自己的成员关系转换成通用 DID 或 account，并写入 Pusher channel ACL。
 
 ```http
-GET /api/v1/admin/pusher/project-identities?instanceId=project-main
-POST /api/v1/admin/pusher/project-identities
+GET /api/v1/admin/pusher/channel/acls?appId=project&channel=private-workspace.project-main
+POST /api/v1/admin/pusher/channel/acls
 ```
 
 ```json
 {
-  "instanceId": "project-main",
-  "projectUserId": "1001",
-  "identityDid": "did:yeying:wid_abc",
-  "walletAddress": "0x1111111111111111111111111111111111111111",
+  "appId": "project",
+  "channel": "private-workspace.project-main",
+  "subject": "did:yeying:wid_abc",
+  "subjectType": "identity",
   "metadata": {
     "nickname": "Alice"
   }
@@ -564,9 +563,9 @@ POST /api/v1/admin/pusher/project-identities
 授权规则：
 
 - `private-user.<subject>` 必须匹配当前登录主体。
-- `private-project.<instanceId>` 必须存在 active Project 身份映射。
-- 当前登录 token 仍主要携带钱包地址，因此一期同时支持用 `walletAddress` 匹配。
-- 后续登录态稳定携带 Node DID 后，优先使用 `identityDid` 匹配。
+- 其它 `private-*` 必须存在 active channel ACL。
+- ACL subject 使用通用 DID 或 account，不使用 Project user id 等应用内部用户标识。
+- 当前登录主体会通过 `identity_account_links` 做 DID/account 等价匹配。
 
 权限来源：
 
@@ -597,8 +596,8 @@ Project 等社区项目优先使用原生方式；Laravel 广播兼容优先使�
 
 资源权限可以通过三种策略实现：
 
-- Node 本地策略：适合 `private-user.{id}`、`private-app.{appId}`。
-- Node 本地映射：适合 Project 的 `private-project.{instanceId}`。
+- Node 本地策略：适合 `private-user.{id}`。
+- 应用侧 ACL：适合 `private-workspace.{id}`、`private-room.{id}` 等应用自定义私有频道。
 - UCAN capability：适合 Warehouse/Router 这类能力明确的服务。
 
 ### 9.3 Event 发布授权
@@ -627,7 +626,7 @@ Node Pusher 负责实时事件入口和 fanout；通知中心负责可见通知�
 
 ```text
 Project task.updated
-  -> Node Pusher fanout to private-project.project-main
+  -> Node Pusher fanout to private-workspace.project-main
   -> persist notification for assignees
   -> Notification Center inbox/webhook/email/webpush
 ```
@@ -1202,7 +1201,7 @@ Project 当前的任务、看板、讨论和文件在线同步由 Swoole WebSock
 | Node Pusher 一期协议 | 原生 HTTP publish + SSE subscribe | 先建立 Node 长期稳定协议，快速复用现有 HTTP、鉴权、通知中心和审计能力 |
 | Email 是否纳入一期 | 纳入 | 避免 Project、Router、Warehouse 各自建设 SMTP、模板、退订、限流和投递日志 |
 | Email 定位 | 通知中心的离线/异步投递出口 | 不把 Email 混入实时连接 runtime，统一由通知中心和 delivery worker 调度 |
-| 收件邮箱来源 | 优先 Node 已验证邮箱 | 安全类邮件使用可信邮箱，外部项目邮箱通过可信映射后置支持 |
+| 收件邮箱来源 | Node 已验证邮箱 | 安全类邮件使用可信邮箱，应用只传 DID/account，不传项目内邮箱 |
 | 安全类邮件退订 | 不允许完全关闭，只允许限频或异常抑制 | 防止用户错过登录、TOTP、Passkey、钱包关联和凭证变更等安全事件 |
 | Pusher-compatible 范围 | 先 HTTP publish + private auth，WebSocket 后置 | Laravel 后端可以先接入发布能力，前端继续优先用 SSE |
 | Email 默认策略 | `security` 即时；重要 `transactional` 即时；`digest` 一期默认关闭聚合发送，只预留模型 | 控制打扰和成本，避免高频事件默认发邮件 |
@@ -1211,7 +1210,7 @@ Project 当前的任务、看板、讨论和文件在线同步由 Swoole WebSock
 | 发件域名 | 统一社区发件域名，例如 `notify.yeying.com` | SPF/DKIM/DMARC、退信处理和品牌信誉集中治理 |
 | 发件人显示 | `YeYing Notifications <no-reply@notify.yeying.com>` | 用户在邮箱客户端看到稳定可信的统一身份 |
 | `Reply-To` | 一期统一支持邮箱，项目级回复地址后置审核 | 避免用户回复无人处理，同时不放开项目任意配置 |
-| Project 身份映射 | Node DID 做主键，Project user id 做外部映射 | 决定 private channel 鉴权、收件人解析和审计归属 |
+| Channel ACL | appId + channel + DID/account 授权 | 决定应用私有频道订阅权限，不引入 Project user id 等应用专用映射 |
 | Project 接入路径 | 保留现有 WebSocket，先接原生 publish client，后评估 Pusher-compatible | 不把 Node Pusher 作为 Project 当前任务同步的前置条件，避免双发重复通知 |
 | Digest 策略 | 一期先不做聚合发送，只预留模型 | 降低一期 worker、模板和偏好复杂度 |
 | 邮件偏好入口 | 用户设置页提供统一邮件偏好和退订管理 | 提供用户可控性和合规入口 |

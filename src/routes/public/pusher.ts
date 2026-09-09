@@ -212,9 +212,13 @@ export function registerAdminPusherRoutes(app: Express) {
     }
   })
 
-  app.get('/api/v1/admin/pusher/project-identities', async (req: Request, res: Response) => {
+  app.get('/api/v1/admin/pusher/channel/acls', async (req: Request, res: Response) => {
     try {
-      const items = await service.listProjectIdentityMappings(String(req.query.instanceId || '').trim())
+      const items = await service.listChannelAcls({
+        appId: String(req.query.appId || '').trim(),
+        channel: String(req.query.channel || '').trim(),
+        subject: String(req.query.subject || '').trim(),
+      })
       res.json(ok({ items }))
     } catch (error) {
       const mapped = mapPusherError(error)
@@ -222,19 +226,20 @@ export function registerAdminPusherRoutes(app: Express) {
     }
   })
 
-  app.post('/api/v1/admin/pusher/project-identities', async (req: Request, res: Response) => {
+  app.post('/api/v1/admin/pusher/channel/acls', async (req: Request, res: Response) => {
     try {
       const payload = {
-        instanceId: req.body?.instanceId,
-        projectUserId: req.body?.projectUserId,
-        identityDid: req.body?.identityDid,
-        walletAddress: req.body?.walletAddress,
+        appId: req.body?.appId,
+        channel: req.body?.channel,
+        subject: req.body?.subject,
+        subjectType: req.body?.subjectType,
         metadata: req.body?.metadata && typeof req.body.metadata === 'object' && !Array.isArray(req.body.metadata)
           ? req.body.metadata
           : {},
         status: req.body?.status,
+        expiresAt: req.body?.expiresAt,
       }
-      const result = await signedAdminAction(req, 'admin_pusher_project_identity_upsert', payload, () => service.upsertProjectIdentityMapping(payload))
+      const result = await signedAdminAction(req, 'admin_pusher_channel_acl_upsert', payload, () => service.upsertChannelAcl(payload))
       res.status(result.status).json(result.body)
     } catch (error) {
       const mapped = mapPusherError(error)

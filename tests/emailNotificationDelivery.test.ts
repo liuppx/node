@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SingletonDataSource } from '../src/domain/facade/datasource'
-import { EmailTemplateDO, IdentityCredentialDO, NotificationDO, NotificationDeliveryDO, ProjectIdentityMappingDO } from '../src/domain/mapper/entity'
+import { EmailTemplateDO, IdentityAccountLinkDO, IdentityCredentialDO, NotificationDO, NotificationDeliveryDO } from '../src/domain/mapper/entity'
 import { NotificationService } from '../src/domain/service/notification'
 import { createInMemoryDataSource } from './helpers/inMemoryDataSource'
 
@@ -36,20 +36,9 @@ function emailCredentialToken(email: string) {
 }
 
 describe('email notification delivery', () => {
-  it('prepares email deliveries from active Node email credentials', async () => {
+  it('prepares email deliveries from direct identity DID recipients', async () => {
     const dataSource = createInMemoryDataSource()
     SingletonDataSource.set(dataSource as any)
-    await dataSource.getRepository(ProjectIdentityMappingDO).save({
-      uid: 'mapping-1',
-      instanceId: 'project-main',
-      projectUserId: '1001',
-      identityDid: 'did:yeying:wid_1234567890123456789012',
-      walletAddress: '0x1111111111111111111111111111111111111111',
-      metadataJson: '{}',
-      status: 'active',
-      createdAt: '2026-09-01T00:00:00.000Z',
-      updatedAt: '2026-09-01T00:00:00.000Z',
-    })
     await dataSource.getRepository(IdentityCredentialDO).save({
       credentialId: 'email-1',
       identityDid: 'did:yeying:wid_1234567890123456789012',
@@ -82,7 +71,7 @@ describe('email notification delivery', () => {
 
     const deliveries = await (service as any).prepareEmailDeliveries(
       notification,
-      ['0x1111111111111111111111111111111111111111'],
+      ['did:yeying:wid_1234567890123456789012'],
       '2026-09-01T00:00:00.000Z'
     )
 
@@ -90,6 +79,58 @@ describe('email notification delivery', () => {
     expect(deliveries[0].channel).toBe('email')
     expect(deliveries[0].target).toBe('alice@example.com')
     expect(deliveries[0].status).toBe('pending')
+  })
+
+  it('prepares email deliveries from active identity account links', async () => {
+    const dataSource = createInMemoryDataSource()
+    SingletonDataSource.set(dataSource as any)
+    await dataSource.getRepository(IdentityAccountLinkDO).save({
+      uid: 'link-1',
+      identityDid: 'did:yeying:wid_1234567890123456789012',
+      chainKey: 'eip155:1',
+      accountId: '0x2222222222222222222222222222222222222222',
+      status: 'active',
+      verifiedAt: '2026-09-01T00:00:00.000Z',
+      revokedAt: '',
+    })
+    await dataSource.getRepository(IdentityCredentialDO).save({
+      credentialId: 'email-2',
+      identityDid: 'did:yeying:wid_1234567890123456789012',
+      credentialType: 'EmailCredential',
+      token: emailCredentialToken('alice@example.com'),
+      status: 'active',
+      issuedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '2999-09-01T00:00:00.000Z',
+      revokedAt: '',
+    })
+    const service = new NotificationService()
+    const notification = {
+      uid: 'notification-2',
+      type: 'warehouse.balance.insufficient',
+      source: 'warehouse',
+      subjectType: 'warehouse_user',
+      subjectId: '1001',
+      actor: '',
+      audienceType: 'user',
+      audienceIds: '[]',
+      level: 'warning',
+      title: '存储额度接近上限',
+      body: '当前已使用 91.54%。',
+      payload: JSON.stringify({ emailTemplateId: 'warehouse-balance-insufficient' }),
+      status: 'delivered',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '',
+    } as NotificationDO
+
+    const deliveries = await (service as any).prepareEmailDeliveries(
+      notification,
+      ['0x2222222222222222222222222222222222222222'],
+      '2026-09-01T00:00:00.000Z'
+    )
+
+    expect(deliveries).toHaveLength(1)
+    expect(deliveries[0].target).toBe('alice@example.com')
   })
 
   it('sends pending email deliveries and marks them delivered', async () => {

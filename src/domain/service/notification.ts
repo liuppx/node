@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getCurrentUtcString } from '../../common/date'
 import { SingletonDataSource } from '../facade/datasource'
 import { SingletonLogger } from '../facade/logger'
-import { IdentityCredentialDO, NotificationDO, NotificationInboxDO, NotificationWebhookDO, NotificationDeliveryDO, NotificationPreferenceDO, ProjectIdentityMappingDO } from '../mapper/entity'
+import { IdentityAccountLinkDO, IdentityCredentialDO, NotificationDO, NotificationInboxDO, NotificationWebhookDO, NotificationDeliveryDO, NotificationPreferenceDO } from '../mapper/entity'
 import {
   publishNotificationEvent,
   type NotificationStreamEvent,
@@ -185,8 +185,8 @@ export class NotificationService {
   private webhookRepository: Repository<NotificationWebhookDO>
   private deliveryRepository: Repository<NotificationDeliveryDO>
   private identityCredentialRepository: Repository<IdentityCredentialDO>
+  private identityAccountLinkRepository: Repository<IdentityAccountLinkDO>
   private preferenceRepository: Repository<NotificationPreferenceDO>
-  private projectIdentityRepository: Repository<ProjectIdentityMappingDO>
 
   constructor() {
     const dataSource = SingletonDataSource.get()
@@ -195,8 +195,8 @@ export class NotificationService {
     this.webhookRepository = dataSource.getRepository(NotificationWebhookDO)
     this.deliveryRepository = dataSource.getRepository(NotificationDeliveryDO)
     this.identityCredentialRepository = dataSource.getRepository(IdentityCredentialDO)
+    this.identityAccountLinkRepository = dataSource.getRepository(IdentityAccountLinkDO)
     this.preferenceRepository = dataSource.getRepository(NotificationPreferenceDO)
-    this.projectIdentityRepository = dataSource.getRepository(ProjectIdentityMappingDO)
   }
 
   private normalizeRecipients(input: string[]): string[] {
@@ -326,6 +326,39 @@ export class NotificationService {
     return notification
   }
 
+  async ensureEmailDeliveriesForPusherEvent(input: {
+    pusherEventId: string
+    recipients: string[]
+  }): Promise<number> {
+    const pusherEventId = String(input.pusherEventId || '').trim()
+    const recipients = this.normalizeRecipients(input.recipients)
+    if (!pusherEventId || recipients.length === 0) {
+      return 0
+    }
+    const pattern = `%"pusherEventId":"${escapeSqlLikeValue(pusherEventId)}"%`
+    const notifications = await this.notificationRepository
+      .createQueryBuilder('notification')
+      .where('notification.payload LIKE :pattern', { pattern })
+      .orderBy('notification.createdAt', 'DESC')
+      .getMany()
+    let created = 0
+    const now = getCurrentUtcString()
+    for (const notification of notifications) {
+      const existingEmailDeliveries = await this.deliveryRepository.findBy({
+        notificationUid: notification.uid,
+        channel: 'email',
+      })
+      const existingTargets = new Set(existingEmailDeliveries.map((item) => normalizeRecipient(item.target)))
+      const emailDeliveries = await this.prepareEmailDeliveries(notification, recipients, now)
+      const missing = emailDeliveries.filter((item) => !existingTargets.has(normalizeRecipient(item.target)))
+      if (missing.length > 0) {
+        await this.deliveryRepository.save(missing)
+        created += missing.length
+      }
+    }
+    return created
+  }
+
   private shouldCreateEmailDelivery(notification: NotificationDO): boolean {
     if (notification.type.startsWith('security.') || notification.type.includes('.security.')) {
       return true
@@ -385,11 +418,13 @@ export class NotificationService {
     }
     let identityDid = normalized.startsWith('did:yeying:') ? normalized : ''
     if (!identityDid) {
-      const mapping = await this.projectIdentityRepository.findOneBy({
-        walletAddress: normalized,
+      const link = await this.identityAccountLinkRepository.findOneBy({
+        accountId: normalized,
         status: 'active',
       })
-      identityDid = String(mapping?.identityDid || '').trim().toLowerCase()
+      if (link && !String(link.revokedAt || '').trim()) {
+        identityDid = String(link.identityDid || '').trim().toLowerCase()
+      }
     }
     if (!identityDid) {
       return ''

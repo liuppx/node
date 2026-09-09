@@ -4,7 +4,7 @@ import { Repository } from 'typeorm'
 import { getCurrentUtcString } from '../../common/date'
 import { getDerivedRuntimeSecret } from '../../security/secretVault'
 import { SingletonDataSource } from '../facade/datasource'
-import { EmailTemplateDO, NotificationPreferenceDO, ProjectIdentityMappingDO, PusherAppDO, PusherEventDO } from '../mapper/entity'
+import { EmailTemplateDO, IdentityAccountLinkDO, NotificationPreferenceDO, PusherAppDO, PusherChannelAclDO, PusherEventDO } from '../mapper/entity'
 import { NotificationService } from './notification'
 import { publishPusherEvent, type PusherStreamEvent } from './pusherEvents'
 
@@ -50,16 +50,17 @@ export type PusherPublishResult = {
 
 export type PusherBacklogItem = PusherStreamEvent
 
-export type ProjectIdentityMappingRecord = {
+export type PusherChannelAclRecord = {
   uid: string
-  instanceId: string
-  projectUserId: string
-  identityDid: string
-  walletAddress: string
+  appId: string
+  channel: string
+  subject: string
+  subjectType: string
   metadata: Record<string, unknown>
   status: string
   createdAt: string
   updatedAt: string
+  expiresAt: string
 }
 
 export type NotificationPreferenceRecord = {
@@ -294,22 +295,31 @@ function isSecurityEventType(eventType: string): boolean {
   return eventType.startsWith('security.') || eventType.includes('.security.')
 }
 
-function parsePrivateProjectInstanceId(channel: string): string {
-  const parts = String(channel || '').trim().split('.')
-  if (parts[0] !== 'private-project' || !parts[1]) {
-    return ''
-  }
-  return normalizeIdentifier(parts[1], '')
-}
-
 function normalizeOrigin(input: unknown): string {
   return String(input || '').trim().replace(/\/$/g, '').toLowerCase()
+}
+
+function normalizeSubjectType(input: unknown, subject: string): string {
+  const value = String(input || '').trim().toLowerCase()
+  if (value === 'identity' || value === 'did') {
+    return 'identity'
+  }
+  if (value === 'account' || value === 'wallet') {
+    return 'account'
+  }
+  return subject.startsWith('did:yeying:') ? 'identity' : 'account'
+}
+
+function isAclExpired(expiresAt: string, nowIso = getCurrentUtcString()): boolean {
+  const normalized = String(expiresAt || '').trim()
+  return Boolean(normalized && normalized <= nowIso)
 }
 
 export class PusherService {
   private appRepository: Repository<PusherAppDO>
   private eventRepository: Repository<PusherEventDO>
-  private projectIdentityRepository: Repository<ProjectIdentityMappingDO>
+  private channelAclRepository: Repository<PusherChannelAclDO>
+  private identityAccountLinkRepository: Repository<IdentityAccountLinkDO>
   private preferenceRepository: Repository<NotificationPreferenceDO>
   private emailTemplateRepository: Repository<EmailTemplateDO>
   private notificationService: NotificationService
@@ -318,7 +328,8 @@ export class PusherService {
     const dataSource = SingletonDataSource.get()
     this.appRepository = dataSource.getRepository(PusherAppDO)
     this.eventRepository = dataSource.getRepository(PusherEventDO)
-    this.projectIdentityRepository = dataSource.getRepository(ProjectIdentityMappingDO)
+    this.channelAclRepository = dataSource.getRepository(PusherChannelAclDO)
+    this.identityAccountLinkRepository = dataSource.getRepository(IdentityAccountLinkDO)
     this.preferenceRepository = dataSource.getRepository(NotificationPreferenceDO)
     this.emailTemplateRepository = dataSource.getRepository(EmailTemplateDO)
     this.notificationService = notificationService
@@ -353,17 +364,18 @@ export class PusherService {
     }
   }
 
-  private mapProjectIdentityMapping(mapping: ProjectIdentityMappingDO): ProjectIdentityMappingRecord {
+  private mapChannelAcl(acl: PusherChannelAclDO): PusherChannelAclRecord {
     return {
-      uid: mapping.uid,
-      instanceId: mapping.instanceId,
-      projectUserId: mapping.projectUserId,
-      identityDid: mapping.identityDid,
-      walletAddress: mapping.walletAddress,
-      metadata: parseJsonObject(mapping.metadataJson),
-      status: mapping.status,
-      createdAt: mapping.createdAt,
-      updatedAt: mapping.updatedAt,
+      uid: acl.uid,
+      appId: acl.appId,
+      channel: acl.channel,
+      subject: acl.subject,
+      subjectType: acl.subjectType,
+      metadata: parseJsonObject(acl.metadataJson),
+      status: acl.status,
+      createdAt: acl.createdAt,
+      updatedAt: acl.updatedAt,
+      expiresAt: acl.expiresAt || '',
     }
   }
 
@@ -502,45 +514,52 @@ export class PusherService {
     return rows.map((row) => this.mapApp(row))
   }
 
-  async upsertProjectIdentityMapping(input: {
-    instanceId: string
-    projectUserId: string
-    identityDid: string
-    walletAddress?: string
+  async upsertChannelAcl(input: {
+    appId: string
+    channel: string
+    subject: string
+    subjectType?: string
     metadata?: Record<string, unknown>
     status?: string
-  }): Promise<ProjectIdentityMappingRecord> {
-    const instanceId = normalizeIdentifier(input.instanceId, '')
-    const projectUserId = String(input.projectUserId || '').trim()
-    const identityDid = String(input.identityDid || '').trim().toLowerCase()
-    const walletAddress = String(input.walletAddress || '').trim().toLowerCase()
-    if (!instanceId || !projectUserId || !identityDid) {
-      throw new Error('Project identity mapping requires instanceId, projectUserId and identityDid')
+    expiresAt?: string
+  }): Promise<PusherChannelAclRecord> {
+    const appId = normalizeIdentifier(input.appId, '')
+    const channel = String(input.channel || '').trim().toLowerCase()
+    const subject = String(input.subject || '').trim().toLowerCase()
+    if (!appId || !channel || !subject) {
+      throw new Error('Pusher channel ACL requires appId, channel and subject')
     }
     const now = getCurrentUtcString()
-    const existing = await this.projectIdentityRepository.findOneBy({ instanceId, projectUserId })
-    const mapping = existing || this.projectIdentityRepository.create({ createdAt: now })
-    mapping.instanceId = instanceId
-    mapping.projectUserId = projectUserId
-    mapping.identityDid = identityDid
-    mapping.walletAddress = walletAddress
-    mapping.metadataJson = JSON.stringify(input.metadata || {})
-    mapping.status = String(input.status || 'active').trim() || 'active'
-    mapping.updatedAt = now
-    const saved = await this.projectIdentityRepository.save(mapping)
-    return this.mapProjectIdentityMapping(saved)
+    const existing = await this.channelAclRepository.findOneBy({ appId, channel, subject })
+    const acl = existing || this.channelAclRepository.create({ createdAt: now })
+    acl.appId = appId
+    acl.channel = channel
+    acl.subject = subject
+    acl.subjectType = normalizeSubjectType(input.subjectType, subject)
+    acl.metadataJson = JSON.stringify(input.metadata || {})
+    acl.status = String(input.status || 'active').trim() || 'active'
+    acl.expiresAt = String(input.expiresAt || '').trim()
+    acl.updatedAt = now
+    const saved = await this.channelAclRepository.save(acl)
+    return this.mapChannelAcl(saved)
   }
 
-  async listProjectIdentityMappings(instanceIdInput: string): Promise<ProjectIdentityMappingRecord[]> {
-    const instanceId = normalizeIdentifier(instanceIdInput, '')
-    if (!instanceId) {
+  async listChannelAcls(input: { appId?: string; channel?: string; subject?: string } = {}): Promise<PusherChannelAclRecord[]> {
+    const appId = normalizeIdentifier(input.appId, '')
+    const channel = String(input.channel || '').trim().toLowerCase()
+    const subject = String(input.subject || '').trim().toLowerCase()
+    const where: Record<string, string> = {}
+    if (appId) where.appId = appId
+    if (channel) where.channel = channel
+    if (subject) where.subject = subject
+    if (Object.keys(where).length === 0) {
       return []
     }
-    const rows = await this.projectIdentityRepository.find({
-      where: { instanceId },
+    const rows = await this.channelAclRepository.find({
+      where,
       order: { updatedAt: 'DESC' },
     })
-    return rows.map((row) => this.mapProjectIdentityMapping(row))
+    return rows.map((row) => this.mapChannelAcl(row))
   }
 
   async listNotificationPreferences(subjectInput: string): Promise<NotificationPreferenceRecord[]> {
@@ -690,6 +709,12 @@ export class PusherService {
     const eventId = normalizeIdentifier(input.body.eventId, `evt-${randomUUID()}`)
     const existing = await this.eventRepository.findOneBy({ appId: app.appId, eventId })
     if (existing) {
+      if (existing.persist) {
+        await this.notificationService.ensureEmailDeliveriesForPusherEvent({
+          pusherEventId: existing.eventId,
+          recipients: normalizeStringArray(input.body.recipients),
+        })
+      }
       return {
         eventId: existing.eventId,
         accepted: true,
@@ -729,12 +754,17 @@ export class PusherService {
     publishPusherEvent(streamEvent)
 
     if (persist) {
-      await this.persistNotification({
-        event: saved,
-        data,
-        notification,
-        recipients: normalizeStringArray(input.body.recipients),
-      })
+      try {
+        await this.persistNotification({
+          event: saved,
+          data,
+          notification,
+          recipients: normalizeStringArray(input.body.recipients),
+        })
+      } catch (error) {
+        await this.eventRepository.delete({ uid: saved.uid })
+        throw error
+      }
     }
 
     return {
@@ -779,6 +809,53 @@ export class PusherService {
       .map((event) => this.mapEvent(event))
   }
 
+  private async resolveSubjectAliases(subjectInput: string): Promise<Set<string>> {
+    const subject = String(subjectInput || '').trim().toLowerCase()
+    const aliases = new Set<string>()
+    if (!subject) {
+      return aliases
+    }
+    aliases.add(subject)
+    if (subject.startsWith('did:yeying:')) {
+      const links = await this.identityAccountLinkRepository.findBy({
+        identityDid: subject,
+        status: 'active',
+      })
+      links
+        .filter((link) => !String(link.revokedAt || '').trim())
+        .map((link) => String(link.accountId || '').trim().toLowerCase())
+        .filter(Boolean)
+        .forEach((accountId) => aliases.add(accountId))
+      return aliases
+    }
+    const link = await this.identityAccountLinkRepository.findOneBy({
+      accountId: subject,
+      status: 'active',
+    })
+    if (link && !String(link.revokedAt || '').trim()) {
+      const identityDid = String(link.identityDid || '').trim().toLowerCase()
+      if (identityDid) {
+        aliases.add(identityDid)
+      }
+    }
+    return aliases
+  }
+
+  private async canSubscribeByChannelAcl(appId: string, channel: string, subject: string): Promise<boolean> {
+    const aliases = await this.resolveSubjectAliases(subject)
+    if (aliases.size === 0) {
+      return false
+    }
+    const rows = await this.channelAclRepository.find({
+      where: { appId, status: 'active' },
+      order: { updatedAt: 'DESC' },
+    })
+    return rows
+      .filter((acl) => aliases.has(String(acl.subject || '').trim().toLowerCase()))
+      .filter((acl) => matchesAnyPattern(channel, [String(acl.channel || '').trim().toLowerCase()]))
+      .some((acl) => !isAclExpired(acl.expiresAt))
+  }
+
   async assertCanSubscribe(input: { appId: string; channels: string[]; subject: string; origin?: string }): Promise<void> {
     const app = await this.requireActiveApp(input.appId)
     const allowedOrigins = parseJsonArray(app.allowedOriginsJson).map(normalizeOrigin).filter(Boolean)
@@ -796,31 +873,16 @@ export class PusherService {
         throw new Error(`Pusher channel is not allowed: ${channel}`)
       }
       if (channel.startsWith('private-user.')) {
-        const expected = `private-user.${normalizedSubject}`
-        if (channel.toLowerCase() !== expected) {
+        const aliases = await this.resolveSubjectAliases(normalizedSubject)
+        const allowed = Array.from(aliases).some((alias) => channel.toLowerCase() === `private-user.${alias}`)
+        if (!allowed) {
           throw new Error(`Pusher channel subscription denied: ${channel}`)
         }
         continue
       }
       if (channel.startsWith('private-')) {
-        const instanceId = parsePrivateProjectInstanceId(channel)
-        if (instanceId) {
-          const byIdentity = await this.projectIdentityRepository.findOneBy({
-            instanceId,
-            identityDid: normalizedSubject,
-            status: 'active',
-          })
-          if (byIdentity) {
-            continue
-          }
-          const byWallet = await this.projectIdentityRepository.findOneBy({
-            instanceId,
-            walletAddress: normalizedSubject,
-            status: 'active',
-          })
-          if (byWallet) {
-            continue
-          }
+        if (await this.canSubscribeByChannelAcl(app.appId, channel.toLowerCase(), normalizedSubject)) {
+          continue
         }
         throw new Error(`Pusher private channel subscription denied: ${channel}`)
       }
@@ -852,6 +914,7 @@ export class PusherService {
       payload: {
         pusherEventId: input.event.eventId,
         appId: input.event.appId,
+        ...input.data,
         data: input.data,
       },
     })

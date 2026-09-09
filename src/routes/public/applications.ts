@@ -772,7 +772,7 @@ export function registerPublicApplicationRoutes(app: Express) {
           applicationUid: appRecord.uid,
           owner: user.address,
           allowedOrigins,
-          channelPatterns: ['public-*', 'private-user.*', 'private-project.*'],
+          channelPatterns: ['public-*', 'private-user.*', 'private-*'],
         });
         res.json(ok(created));
       } catch (error) {

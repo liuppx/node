@@ -29,7 +29,7 @@ tags:
   - name: Notifications
     description: 通知收件箱、事件流和 Webhook。
   - name: Pusher
-    description: Node Pusher 原生 publish、SSE subscribe 和 Project 身份映射。
+    description: Node Pusher 原生 publish、SSE subscribe 和通用 channel ACL。
   - name: Publisher
     description: 应用发布包提交、审核和 release artifact 管理。
   - name: Admin
@@ -2284,12 +2284,12 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/JsonObject"
-  /api/v1/admin/pusher/project-identities:
+  /api/v1/admin/pusher/channel/acls:
     get:
       tags:
         - Pusher
-      summary: 列出 Project 身份映射
-      operationId: get_api_v1_admin_pusher_project_identities
+      summary: 列出 Pusher 频道 ACL
+      operationId: get_api_v1_admin_pusher_channel_acls
       security:
         - bearerAuth: []
       parameters: []
@@ -2307,8 +2307,8 @@ paths:
     post:
       tags:
         - Pusher
-      summary: 写入 Project 身份映射
-      operationId: post_api_v1_admin_pusher_project_identities
+      summary: 写入 Pusher 频道 ACL
+      operationId: post_api_v1_admin_pusher_channel_acls
       security:
         - bearerAuth: []
       parameters: []
