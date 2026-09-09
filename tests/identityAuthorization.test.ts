@@ -2,7 +2,7 @@ import { createHmac, generateKeyPairSync, sign } from 'node:crypto'
 import { vi } from 'vitest'
 import { SingletonDataSource } from '../src/domain/facade/datasource'
 import { createInMemoryDataSource } from './helpers/inMemoryDataSource'
-import { IdentityAccountLinkDO, IdentityAuditLogDO, IdentityCredentialDO, IdentityPasskeyCredentialDO, IdentityTotpAuthenticatorDO, IdentityWebauthnChallengeDO } from '../src/domain/mapper/entity'
+import { IdentityAccountLinkDO, IdentityAuditLogDO, IdentityCredentialDO, IdentityPasskeyCredentialDO, IdentityTotpAuthenticatorDO, IdentityUsernameDO, IdentityWebauthnChallengeDO } from '../src/domain/mapper/entity'
 
 vi.mock('../src/config/runtime', () => ({
   getConfig: (key: string) => ({
@@ -246,6 +246,15 @@ describe('identity authorization', () => {
       status: 'active',
       verifiedAt: '2026-08-20T00:00:00.000Z',
       revokedAt: ''
+    }))
+    await SingletonDataSource.get()!.getRepository(IdentityUsernameDO).save(Object.assign(new IdentityUsernameDO(), {
+      namespace: 'node.yeying.pub',
+      normalizedUsername: 'alice',
+      identityDid: passkeyIdentity,
+      status: 'active',
+      reservedUntil: '',
+      createdAt: '2026-08-20T00:00:00.000Z',
+      updatedAt: '2026-08-20T00:00:00.000Z'
     }))
     for (const item of [
       { type: 'EmailCredential' as const, credentialId: 'expired-email', claim: { email: 'alice@example.com', emailVerifiedAt: '2026-08-20T00:00:00.000Z' } },

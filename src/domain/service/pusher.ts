@@ -820,9 +820,9 @@ export class PusherService {
       const links = await this.identityAccountLinkRepository.findBy({
         identityDid: subject,
         status: 'active',
+        revokedAt: '',
       })
       links
-        .filter((link) => !String(link.revokedAt || '').trim())
         .map((link) => String(link.accountId || '').trim().toLowerCase())
         .filter(Boolean)
         .forEach((accountId) => aliases.add(accountId))
@@ -831,8 +831,9 @@ export class PusherService {
     const link = await this.identityAccountLinkRepository.findOneBy({
       accountId: subject,
       status: 'active',
+      revokedAt: '',
     })
-    if (link && !String(link.revokedAt || '').trim()) {
+    if (link) {
       const identityDid = String(link.identityDid || '').trim().toLowerCase()
       if (identityDid) {
         aliases.add(identityDid)

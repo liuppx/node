@@ -88,6 +88,7 @@ export class CustodyKeyRecordDO {
 
 @Entity('identity_account_links')
 @Index('uidx_identity_account_link', ['identityDid', 'chainKey', 'accountId'], { unique: true })
+@Index('uidx_identity_account_active_account', ['chainKey', 'accountId'], { unique: true, where: "status = 'active' AND revoked_at = ''" })
 export class IdentityAccountLinkDO {
     @PrimaryGeneratedColumn('uuid') uid!: string
     @Column({ length: 128, name: 'identity_did' }) identityDid!: string
@@ -130,6 +131,7 @@ export class IdentityVerificationTransactionDO {
 
 @Entity('identity_usernames')
 @Index('uidx_identity_username_namespace_value', ['namespace', 'normalizedUsername'], { unique: true })
+@Index('uidx_identity_username_active_identity', ['namespace', 'identityDid'], { unique: true, where: "status = 'active'" })
 export class IdentityUsernameDO {
     @PrimaryGeneratedColumn('uuid') uid!: string
     @Column({ length: 128 }) namespace!: string

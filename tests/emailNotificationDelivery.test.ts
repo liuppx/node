@@ -81,6 +81,49 @@ describe('email notification delivery', () => {
     expect(deliveries[0].status).toBe('pending')
   })
 
+  it('prepares email deliveries when DID casing differs between recipient and credential', async () => {
+    const dataSource = createInMemoryDataSource()
+    SingletonDataSource.set(dataSource as any)
+    await dataSource.getRepository(IdentityCredentialDO).save({
+      credentialId: 'email-mixed-case',
+      identityDid: 'did:yeying:wid_R93C5XHt0lJ5LUzRbYCpzg',
+      credentialType: 'EmailCredential',
+      token: emailCredentialToken('alice@example.com'),
+      status: 'active',
+      issuedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '2999-09-01T00:00:00.000Z',
+      revokedAt: '',
+    })
+    const service = new NotificationService()
+    const notification = {
+      uid: 'notification-mixed-case',
+      type: 'warehouse.storage.quota.warning',
+      source: 'warehouse',
+      subjectType: 'warehouse_user',
+      subjectId: '1001',
+      actor: '',
+      audienceType: 'user',
+      audienceIds: '[]',
+      level: 'warning',
+      title: '存储额度接近上限',
+      body: '当前已使用 97.61%。',
+      payload: JSON.stringify({ emailTemplateId: 'warehouse-storage-quota-warning' }),
+      status: 'delivered',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt: '2026-09-01T00:00:00.000Z',
+      expiresAt: '',
+    } as NotificationDO
+
+    const deliveries = await (service as any).prepareEmailDeliveries(
+      notification,
+      ['did:yeying:wid_r93c5xht0lj5luzrbycpzg'],
+      '2026-09-01T00:00:00.000Z'
+    )
+
+    expect(deliveries).toHaveLength(1)
+    expect(deliveries[0].target).toBe('alice@example.com')
+  })
+
   it('prepares email deliveries from active identity account links', async () => {
     const dataSource = createInMemoryDataSource()
     SingletonDataSource.set(dataSource as any)

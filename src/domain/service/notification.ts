@@ -412,29 +412,34 @@ export class NotificationService {
   }
 
   private async resolveRecipientEmail(recipient: string): Promise<string> {
+    const rawRecipient = String(recipient || '').trim()
     const normalized = normalizeRecipient(recipient)
     if (!normalized) {
       return ''
     }
-    let identityDid = normalized.startsWith('did:yeying:') ? normalized : ''
+    let identityDid = normalized.startsWith('did:yeying:') ? rawRecipient : ''
     if (!identityDid) {
       const link = await this.identityAccountLinkRepository.findOneBy({
         accountId: normalized,
         status: 'active',
+        revokedAt: '',
       })
-      if (link && !String(link.revokedAt || '').trim()) {
-        identityDid = String(link.identityDid || '').trim().toLowerCase()
+      if (link) {
+        identityDid = String(link.identityDid || '').trim()
       }
     }
     if (!identityDid) {
       return ''
     }
-    const credentials = await this.identityCredentialRepository.findBy({
-      identityDid,
-      credentialType: 'EmailCredential',
-      status: 'active',
+    const credentials = await this.identityCredentialRepository.find({
+      where: {
+        credentialType: 'EmailCredential',
+        status: 'active',
+      },
+      order: { issuedAt: 'DESC' },
     })
     const active = credentials
+      .filter((item) => String(item.identityDid || '').trim().toLowerCase() === identityDid.toLowerCase())
       .filter((item) => !String(item.revokedAt || '').trim())
       .filter((item) => !item.expiresAt || Date.parse(item.expiresAt) > Date.now())
       .sort((left, right) => String(right.issuedAt || '').localeCompare(String(left.issuedAt || '')))
