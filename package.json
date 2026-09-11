@@ -17,8 +17,6 @@
     "secrets:remove": "node scripts/remove-secret.cjs",
     "secrets:unlock": "node scripts/unlock-secrets.cjs",
     "secrets:verify": "node scripts/verify-secrets.cjs",
-    "secrets:migrate-config": "node scripts/migrate-config-secrets.cjs",
-    "secrets:migrate": "node scripts/migrate-secrets.cjs",
     "admin:allow": "node scripts/admin-allow.cjs",
     "package:release": "bash scripts/package.sh",
     "start": "node dist/server.js",

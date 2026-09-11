@@ -126,9 +126,8 @@ copy_release_files() {
   cp "$WORKTREE_DIR/scripts/unlock-secrets.cjs" "$release_root/scripts/unlock-secrets.cjs"
   cp "$WORKTREE_DIR/scripts/secret-vault.cjs" "$release_root/scripts/secret-vault.cjs"
   cp "$WORKTREE_DIR/scripts/set-secret.cjs" "$release_root/scripts/set-secret.cjs"
+  cp "$WORKTREE_DIR/scripts/passwd-secret.cjs" "$release_root/scripts/passwd-secret.cjs"
   cp "$WORKTREE_DIR/scripts/verify-secrets.cjs" "$release_root/scripts/verify-secrets.cjs"
-  cp "$WORKTREE_DIR/scripts/migrate-config-secrets.cjs" "$release_root/scripts/migrate-config-secrets.cjs"
-  cp "$WORKTREE_DIR/scripts/migrate-secrets.cjs" "$release_root/scripts/migrate-secrets.cjs"
   cp "$WORKTREE_DIR/scripts/remove-secret.cjs" "$release_root/scripts/remove-secret.cjs"
   chmod +x \
     "$release_root/cmd" \
@@ -141,9 +140,8 @@ copy_release_files() {
     "$release_root/scripts/unlock-secrets.cjs" \
     "$release_root/scripts/secret-vault.cjs" \
     "$release_root/scripts/set-secret.cjs" \
+    "$release_root/scripts/passwd-secret.cjs" \
     "$release_root/scripts/verify-secrets.cjs" \
-    "$release_root/scripts/migrate-config-secrets.cjs" \
-    "$release_root/scripts/migrate-secrets.cjs" \
     "$release_root/scripts/remove-secret.cjs"
 }
 

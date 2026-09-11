@@ -9,7 +9,9 @@ PID_FILE="${PID_FILE:-$RUN_DIR/node.pid}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/node.log}"
 CONFIG_PATH="${APP_CONFIG_PATH:-$ROOT_DIR/config.js}"
 WEB_DIST_PATH="${WEB_DIST_DIR:-$ROOT_DIR/web/dist}"
-NODE_ENV_VALUE="${NODE_ENV:-production}"
+NODE_ENV_VALUE="${NODE_ENV:-}"
+CONFIG_APP_ENV_VALUE=""
+EFFECTIVE_NODE_ENV_VALUE=""
 START_WAIT_SECONDS="${START_WAIT_SECONDS:-3}"
 SECRETS_PASSWORD_PROMPT_TIMEOUT_SECONDS="${SECRETS_PASSWORD_PROMPT_TIMEOUT_SECONDS:-30}"
 SECRETS_FILE=""
@@ -22,8 +24,12 @@ cleanup_temp_secrets_password_file() {
   fi
 }
 
+lowercase() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
 is_production_environment() {
-  [[ "${NODE_ENV_VALUE,,}" == "production" ]]
+  [[ "$(lowercase "$NODE_ENV_VALUE")" == "production" || "$(lowercase "$CONFIG_APP_ENV_VALUE")" == "production" ]]
 }
 
 info() {
@@ -65,12 +71,15 @@ load_secrets_config() {
 const path = require('path')
 const config = require(path.resolve(process.argv[2]))
 const secrets = config.secrets || {}
+const app = config.app || {}
 const rootDir = path.resolve(process.argv[3])
-process.stdout.write(`${path.resolve(rootDir, secrets.file || 'run/secrets.enc.json')}\n${path.resolve(rootDir, secrets.passwordFile || 'run/.secrets-password')}\n`)
+process.stdout.write(`${path.resolve(rootDir, secrets.file || 'run/secrets.enc.json')}\n${path.resolve(rootDir, secrets.passwordFile || 'run/.secrets-password')}\n${String(app.env || '').trim()}\n`)
 NODE
 )"
   SECRETS_FILE="$(printf '%s\n' "$values" | sed -n '1p')"
   SECRETS_PASSWORD_FILE="$(printf '%s\n' "$values" | sed -n '2p')"
+  CONFIG_APP_ENV_VALUE="$(printf '%s\n' "$values" | sed -n '3p')"
+  EFFECTIVE_NODE_ENV_VALUE="${NODE_ENV_VALUE:-${CONFIG_APP_ENV_VALUE:-dev}}"
 }
 
 ensure_build_artifacts() {
@@ -84,9 +93,10 @@ prepare_secrets_password_file() {
 
   info "检测到加密密钥文件: ${SECRETS_FILE}（将由 Node 进程内解密）"
   if [[ -f "$SECRETS_PASSWORD_FILE" ]]; then
-    if ! is_production_environment; then
-      return 0
+    if is_production_environment; then
+      TEMP_SECRETS_PASSWORD_FILE="$SECRETS_PASSWORD_FILE"
     fi
+    return 0
   fi
 
   if [[ ! -t 0 ]]; then
@@ -179,7 +189,7 @@ start_app() {
   (
     cd "$ROOT_DIR"
     nohup env \
-      NODE_ENV="$NODE_ENV_VALUE" \
+      NODE_ENV="$EFFECTIVE_NODE_ENV_VALUE" \
       APP_CONFIG_PATH="$CONFIG_PATH" \
       WEB_DIST_DIR="$WEB_DIST_PATH" \
       node dist/server.js >>"$LOG_FILE" 2>&1 &
@@ -197,6 +207,7 @@ start_app() {
   fi
 
   if [[ -n "$TEMP_SECRETS_PASSWORD_FILE" ]]; then
+    cleanup_temp_secrets_password_file
     trap - EXIT INT TERM
     TEMP_SECRETS_PASSWORD_FILE=""
   fi
