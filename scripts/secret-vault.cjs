@@ -143,6 +143,19 @@ function replaceVault(filePath, vault) {
 
 function promptHidden(question, options = {}) {
   return new Promise((resolve, reject) => {
+    if (process.env.NODE_ENV === 'test' && process.env.NODE_SECRETS_TEST_INPUTS) {
+      const values = JSON.parse(process.env.NODE_SECRETS_TEST_INPUTS);
+      if (!Array.isArray(values) || values.length === 0) {
+        reject(new Error('NODE_SECRETS_TEST_INPUTS is empty'));
+        return;
+      }
+      const value = values.shift();
+      process.env.NODE_SECRETS_TEST_INPUTS = JSON.stringify(values);
+      process.stdout.write(`${question}: \n`);
+      resolve(String(value ?? ''));
+      return;
+    }
+
     if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== 'function') {
       reject(new Error('Interactive password input requires a TTY'));
       return;

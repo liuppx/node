@@ -81,6 +81,7 @@ npm run dev:secure
 ./cmd service start|stop|restart|status|logs
 ./cmd health --level readiness
 ./cmd secrets set MAIL_SMTP_PASSWORD
+./cmd secrets passwd
 ./cmd admin allow add 0x你的钱包地址
 ```
 
@@ -120,6 +121,12 @@ secrets: {
 ./cmd secrets remove LEGACY_KEY
 ```
 
+修改 vault 解密密码时使用 `passwd`。该命令会用旧密码解密现有 `secrets.enc.json`，再用新密码重新加密同一份密钥，不修改任何密钥值：
+
+```bash
+./cmd secrets passwd
+```
+
 若是从旧版 `config.js` 迁移，不要手工复制或输出密码，使用下列命令将其中的数据库、Redis 和 SMTP 凭据写入 vault，成功后自动从 `config.js` 删除。Issuer 私钥和派生根不支持从配置文件迁移，必须使用 `secrets:set` 写入 vault：
 
 ```bash
@@ -147,7 +154,7 @@ secrets: {
 
 新配置下，JWT、TOTP 存储和 Webhook 加密密钥都从 `NODE_KEY_DERIVATION_SECRET` 按用途派生。`ISSUER_PRIVATE_KEY` 的公钥自动生成 Issuer `kid`，Issuer DID 从 `issuer.baseUrl` 派生。
 
-生产更新顺序：备份现有 `secrets.enc.json` 到受保护的主机级备份系统，停止服务或在维护窗口中执行 `./cmd secrets set` / `./cmd secrets remove`，执行 `./cmd secrets verify`，然后通过 `./cmd service restart` 重启。不得重新执行 `secrets:init --force` 覆盖生产 vault。
+生产更新顺序：备份现有 `secrets.enc.json` 到受保护的主机级备份系统，停止服务或在维护窗口中执行 `./cmd secrets set` / `./cmd secrets remove` / `./cmd secrets passwd`，执行 `./cmd secrets verify`，然后通过 `./cmd service restart` 重启。不得重新执行 `secrets:init --force` 覆盖生产 vault。
 
 ### 3. 启动前端
 

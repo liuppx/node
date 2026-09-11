@@ -26,7 +26,7 @@ Commands:
   ./cmd service start|stop|restart|status|logs
   ./cmd start|stop|restart|status|logs
   ./cmd health [health-check options]
-  ./cmd secrets init|set|remove|unlock|verify|migrate-config|migrate [args]
+  ./cmd secrets init|set|remove|passwd|unlock|verify|migrate-config|migrate [args]
   ./cmd admin allow add|remove|list [did-or-wallet]
 
 Examples:
@@ -99,6 +99,9 @@ run_secrets() {
     remove)
       node "$ROOT_DIR/scripts/remove-secret.cjs" "$@"
       ;;
+    passwd)
+      node "$ROOT_DIR/scripts/passwd-secret.cjs" "$@"
+      ;;
     unlock)
       node "$ROOT_DIR/scripts/unlock-secrets.cjs" "$@"
       ;;
@@ -112,7 +115,7 @@ run_secrets() {
       node "$ROOT_DIR/scripts/migrate-secrets.cjs" "$@"
       ;;
     *)
-      fail "usage: ./cmd secrets init|set|remove|unlock|verify|migrate-config|migrate [args]"
+      fail "usage: ./cmd secrets init|set|remove|passwd|unlock|verify|migrate-config|migrate [args]"
       ;;
   esac
 }
