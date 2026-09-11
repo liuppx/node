@@ -127,20 +127,6 @@ secrets: {
 ./cmd secrets passwd
 ```
 
-若是从旧版 `config.js` 迁移，不要手工复制或输出密码，使用下列命令将其中的数据库、Redis 和 SMTP 凭据写入 vault，成功后自动从 `config.js` 删除。Issuer 私钥和派生根不支持从配置文件迁移，必须使用 `secrets:set` 写入 vault：
-
-```bash
-./cmd secrets migrate-config
-```
-
-将旧 vault 一次迁移到统一 Issuer 和派生根，并重加密已有的 TOTP 与 Webhook 密文：
-
-```bash
-./cmd secrets migrate
-```
-
-该命令会先创建带时间戳的 vault 备份；JWT、TOTP 密文和 Webhook 密文会按新派生根重新处理，用户可能需要重新登录。生产执行前仍应完成数据库备份并停止服务。
-
 启动前执行安全检查。该命令只显示密钥名和校验结果，绝不显示密钥值：
 
 ```bash
