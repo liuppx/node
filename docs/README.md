@@ -29,7 +29,7 @@ Node 在社区生态中的定位以[社区产品关系与开发边界](https://g
 | 身份与授权 | [认证器.md](identity/认证器.md)、[Node登录授权.md](identity/Node登录授权.md)、[DApp登录授权.md](identity/DApp登录授权.md)、[身份凭证.md](identity/身份凭证.md) | 分别解释认证器与安全边界、定义 Node 登录和 Node API 授权规则、定义 DApp 应用登录流程、说明身份凭证类型与验证 |
 | 使用、部署与接口 | [Node使用指南.md](operations/Node使用指南.md)、[生产环境部署手册.md](operations/生产环境部署手册.md)、[接口说明.md](openapi/接口说明.md)、[openapi/README.md](./openapi/README.md) | 面向使用者、运维人员和 API 调用方；运行参数以配置模板为准 |
 | 平台推送 | [Node-Pusher设计.md](integrations/Node-Pusher设计.md)、[Node-Pusher接入示例.md](integrations/Node-Pusher接入示例.md) | 定义 Node 实时事件网关边界、协议和接入方式 |
-| 应用发布 | [YeYing-Application-Protocol-v1.md](./YeYing-Application-Protocol-v1.md)、[YeYing-AppStore-Developer-Manual.md](./YeYing-AppStore-Developer-Manual.md) | 维护 release bundle、发布审核、制品校验和开发者接入说明 |
+| 应用发布 | [应用协议 v1](./protocols/YeYing-Application-Protocol-v1.md)、[AppStore 开发者手册](./protocols/YeYing-AppStore-Developer-Manual.md) | 维护 release bundle、发布审核、制品校验和开发者接入说明 |
 | 业务流程与数据 | [应用中心.md](business/应用中心.md)、[MPC协调器.md](business/MPC协调器.md)、[通知中心.md](business/通知中心.md)、[钱包托管.md](business/钱包托管.md) | 按应用发布、MPC 协调、通知、钱包密钥托管等领域维护业务模型、架构和流程；核心数据模型见架构分类 |
 | 支付 | [支付收银台.md](business/支付收银台.md) | 说明商户、DApp 集成、微信收款、退款回调和提现边界 |
 | 开发与运维参考 | [scripts-specification.md](operations/scripts-specification.md)、[生产环境部署手册.md](operations/生产环境部署手册.md)、[openapi/README.md](./openapi/README.md) | 维护脚本约定、生产运维和机器可读接口规范使用说明 |
@@ -52,13 +52,13 @@ Node 在社区生态中的定位以[社区产品关系与开发边界](https://g
 - `钱包身份生产部署检查清单.md`：合入[生产环境部署手册.md](operations/生产环境部署手册.md)的身份服务上线验收章节。
 - `Project-实时SSE集成研究.md`：已确认结论合入[Node-Pusher接入示例.md](integrations/Node-Pusher接入示例.md)。
 - `YeYing-AppStore-P1.md`、`YeYing-AppStore-Runtime-Agent.md`：Node 与 Project 安装及 Agent Runtime 执行控制面的职责边界，已纳入架构和历史路线说明。
-- `YeYing-AppStore-Smoke-Test.md`：Node release smoke test 已并入[YeYing-AppStore-Developer-Manual.md](./YeYing-AppStore-Developer-Manual.md)。
+- `YeYing-AppStore-Smoke-Test.md`：Node release smoke test 已并入 [AppStore 开发者手册](./protocols/YeYing-AppStore-Developer-Manual.md)。
 
 以下文档继续独立维护，因为它们承担不同职责或有外部路径依赖：
 
 - `business/通知中心.md`与`integrations/Node-Pusher设计.md`：分别定义通知持久化/投递和实时事件入口/fanout。
 - [openapi/接口说明.md](openapi/接口说明.md)：维护人工可读 API 分组概览，具体字段以 OpenAPI 为准。
-- `YeYing-Application-Protocol-v1.md`与`YeYing-AppStore-Developer-Manual.md`：分别维护协议契约和开发者操作手册；后者也是 Node 线上页面的内容来源。
+- [协议目录](./protocols/README.md)：维护 YeYing 应用协议和 AppStore 开发者操作手册；后者也是 Node 线上页面的内容来源。
 - `应用 AppId 与版本迁移方案.md`：生产迁移完成后不再单独维护；稳定 AppId 与版本规则已并入[应用中心](business/应用中心.md)，数据模型见[数据结构](architecture/数据结构.md)。
 
 新增文档应明确读者和职责，并加入本索引；具体要求见社区[项目文档编写规范](https://github.com/yeying-community/deployer/blob/main/specification/DOCUMENTATION_GUIDELINES.md)。

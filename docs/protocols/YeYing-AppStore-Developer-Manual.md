@@ -148,4 +148,4 @@ Project 安装、升级、回滚和卸载验证由 Agent Runtime 仓库维护。
 ## 8. 参考资料
 
 - [应用协议 v1](./YeYing-Application-Protocol-v1.md)
-- [系统架构](architecture/系统架构.md)
+- [系统架构](../architecture/系统架构.md)
