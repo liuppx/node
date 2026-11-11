@@ -134,6 +134,8 @@ Node 前端首页提供邮箱登录/注册入口，相关接口为：
 - `POST /api/v1/public/auth/email/login/request`
 - `POST /api/v1/public/auth/email/login/confirm`
 
+下面涉及的 Web 身份验证（Web Authentication，简称 WebAuthn）由浏览器调用认证器完成；本文后续统一使用 WebAuthn。
+
 注册时浏览器先生成与 Wallet 相同格式的 `did:yeying:wid_*` DID Document、Ethereum 主网账户和密码加密材料。发送验证码前，页面必须确认当前是安全上下文且 WebAuthn 可用，并调用平台认证器能力检测：检测到平台认证器时默认使用本机设备（Windows PIN、屏幕锁、指纹或人脸）；未检测到时，用户必须先选择手机跨设备认证或外接安全密钥。Google Play、Google 密码管理工具和 iCloud 不是协议前置条件，但浏览器必须实际具备一种可完成 WebAuthn 的认证器。
 
 `/email/register/request` 只固定 pending registration、DID Document hash、邮箱验证码和用户名预约，不提前创建 WebAuthn challenge。`/email/register/confirm` 在 OTP 验证成功后接收 `authenticatorMode=platform|hybrid|security-key`，按模式生成 `residentKey=required`、`userVerification=required` 的 discoverable credential challenge。若用户取消系统提示，可保留同一验证码与本地加密草稿、切换认证方式并再次确认；Node 在同一 challenge 记录上轮换 challenge 值并立即废止旧值，同时保持 registration ID、DID、钱包地址、DID Document hash 和用户名预约不变。

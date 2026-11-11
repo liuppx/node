@@ -8,7 +8,7 @@ Node 在社区生态中的定位以[社区产品关系与开发边界](https://g
 
 ## 推荐阅读顺序
 
-1. [核心概念.md](architecture/核心概念.md)：Node 身份、Passkey/WebAuthn、VC、授权流程和云端恢复术语。
+1. [核心概念.md](architecture/核心概念.md)：Node 身份、通行密钥和 Web 身份验证（Web Authentication，简称 WebAuthn）、VC、授权流程和云端恢复术语。
 2. [系统架构.md](architecture/系统架构.md)：当前 Node 的产品职责、逻辑架构和已实现能力概览。
 3. [Node使用指南.md](operations/Node使用指南.md)：配置、鉴权、MPC、通知、托管和 Registry 使用方式。
 4. [认证器.md](identity/认证器.md)：先理解身份主体、认证器、Passkey、钱包密钥和应用会话的边界。
